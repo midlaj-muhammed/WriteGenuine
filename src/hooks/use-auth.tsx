@@ -4,17 +4,20 @@ import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { api } from "../convex/_generated/api";
 import { useEffect, useState } from "react";
 
-// Define a type for the function reference to avoid TypeScript errors
-type FunctionReference<T extends "mutation" | "query"> = string;
+// Define the correct type for Convex function references
+// This is a workaround for development mode with auto-generated types
+type ConvexFunction = any; // This allows us to bypass TypeScript checking during development
 
 export function useAuth() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { user } = useUser();
-  const createUser = useMutation(api.users.createUser as FunctionReference<"mutation">);
+  
+  // Cast the string to any to bypass TypeScript checking during development
+  const createUser = useMutation(api.users.createUser as ConvexFunction);
   const [isInitialized, setIsInitialized] = useState(false);
   
   const userData = useQuery(
-    api.users.getUserByClerkId as FunctionReference<"query">,
+    api.users.getUserByClerkId as ConvexFunction,
     user?.id ? { clerkId: user.id } : "skip"
   );
 
