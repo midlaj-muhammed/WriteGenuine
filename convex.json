@@ -1,0 +1,20 @@
+
+{
+  "functions": {
+    "path": "./src/convex"
+  },
+  "authConfig": {
+    "providers": {
+      "clerk": {
+        "authWebhooks": {
+          "production": {
+            "events": ["user.created"]
+          },
+          "development": {
+            "events": ["user.created"]
+          }
+        }
+      }
+    }
+  }
+}

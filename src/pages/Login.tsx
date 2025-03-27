@@ -4,10 +4,66 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
+import { useSignIn } from '@clerk/clerk-react';
+import { Form } from '@/components/ui/form';
+import { toast } from 'sonner';
 
 const Login = () => {
+  const { isLoaded, signIn, setActive } = useSignIn();
+  const navigate = useNavigate();
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!isLoaded) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        toast.success("Logged in successfully");
+        navigate("/dashboard");
+      } else {
+        console.error("Login failed", result);
+        toast.error("Something went wrong. Please try again.");
+      }
+    } catch (error: any) {
+      console.error("Error during login:", error);
+      toast.error(error.errors?.[0]?.message || "An error occurred during login");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: "oauth_google" | "oauth_github") => {
+    if (!isLoaded) return;
+    
+    try {
+      setIsLoading(true);
+      await signIn.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl: '/dashboard',
+        redirectUrlComplete: '/dashboard',
+      });
+    } catch (error) {
+      console.error("OAuth error:", error);
+      toast.error("Failed to login with provider");
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-b from-muted/50 to-muted">
       <div className="w-full max-w-md">
@@ -23,20 +79,39 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="name@example.com" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-                  Forgot password?
-                </Link>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                  required
+                />
               </div>
-              <Input id="password" type="password" />
-            </div>
-            <Button className="w-full">Login</Button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <Input 
+                  id="password" 
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <Button className="w-full" type="submit" disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Login"}
+              </Button>
+            </form>
             
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
@@ -48,10 +123,20 @@ const Login = () => {
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => handleOAuthSignIn("oauth_google")}
+                disabled={isLoading}
+              >
                 Google
               </Button>
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => handleOAuthSignIn("oauth_github")}
+                disabled={isLoading}
+              >
                 GitHub
               </Button>
             </div>
