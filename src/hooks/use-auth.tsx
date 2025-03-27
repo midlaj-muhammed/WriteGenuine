@@ -4,14 +4,17 @@ import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { api } from "../convex/_generated/api";
 import { useEffect, useState } from "react";
 
+// Define a type for the function reference to avoid TypeScript errors
+type FunctionReference<T extends "mutation" | "query"> = string;
+
 export function useAuth() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { user } = useUser();
-  const createUser = useMutation(api.users.createUser);
+  const createUser = useMutation(api.users.createUser as FunctionReference<"mutation">);
   const [isInitialized, setIsInitialized] = useState(false);
   
   const userData = useQuery(
-    api.users.getUserByClerkId,
+    api.users.getUserByClerkId as FunctionReference<"query">,
     user?.id ? { clerkId: user.id } : "skip"
   );
 

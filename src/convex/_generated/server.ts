@@ -4,4 +4,7 @@
 
 import { v } from "convex/values";
 
+// Create stub functions for development purposes
+export const mutation = (args: any) => args;
+export const query = (args: any) => args;
 export const GenericId = v.string();
