@@ -15,10 +15,13 @@ if (!convexUrl) {
 // Initialize Convex client - ensuring we always provide a valid URL even for development fallback
 const convex = new ConvexReactClient(convexUrl || "https://noop.convex.cloud");
 
-// Get Clerk publishable key from environment variable
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+// Get Clerk publishable key from environment variables - support both VITE_ and NEXT_PUBLIC_ prefixes
+const CLERK_PUBLISHABLE_KEY = 
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 
+  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 
+  "pk_test_aW1tdW5lLXBlcmNoLTU0LmNsZXJrLmFjY291bnRzLmRldiQ"; // Fallback to the provided key
 
-// We need to provide a valid publishable key for Clerk even in development
+// We need to provide a valid publishable key for Clerk
 if (!CLERK_PUBLISHABLE_KEY) {
   // Instead of throwing an error, render a more user-friendly message
   const rootElement = document.getElementById("root");
