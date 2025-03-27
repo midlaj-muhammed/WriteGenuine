@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SignedIn, SignedOut, UserButton, useClerk } from '@clerk/clerk-react';
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +23,10 @@ const Navigation = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSignOut = () => {
+    signOut();
+  };
 
   return (
     <nav 
@@ -43,14 +49,27 @@ const Navigation = () => {
           <NavLink to="/#features">Features</NavLink>
           <NavLink to="/#pricing">Pricing</NavLink>
           <NavLink to="/dashboard">Dashboard</NavLink>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" asChild>
-              <Link to="/login">Log in</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/signup">Sign up</Link>
-            </Button>
-          </div>
+          
+          <SignedIn>
+            <div className="flex items-center gap-4">
+              <UserButton afterSignOutUrl="/" />
+              <Button variant="outline" onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </Button>
+            </div>
+          </SignedIn>
+          
+          <SignedOut>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" asChild>
+                <Link to="/login">Log in</Link>
+              </Button>
+              <Button asChild>
+                <Link to="/signup">Sign up</Link>
+              </Button>
+            </div>
+          </SignedOut>
         </div>
 
         {/* Mobile Menu Button */}
@@ -69,14 +88,27 @@ const Navigation = () => {
           <MobileNavLink to="/#features" onClick={() => setIsMobileMenuOpen(false)}>Features</MobileNavLink>
           <MobileNavLink to="/#pricing" onClick={() => setIsMobileMenuOpen(false)}>Pricing</MobileNavLink>
           <MobileNavLink to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</MobileNavLink>
-          <div className="flex flex-col gap-2 pt-2">
-            <Button variant="outline" asChild className="w-full">
-              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Log in</Link>
-            </Button>
-            <Button asChild className="w-full">
-              <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>Sign up</Link>
-            </Button>
-          </div>
+          
+          <SignedIn>
+            <div className="flex items-center justify-between py-2">
+              <UserButton afterSignOutUrl="/" />
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </Button>
+            </div>
+          </SignedIn>
+          
+          <SignedOut>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button variant="outline" asChild className="w-full">
+                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Log in</Link>
+              </Button>
+              <Button asChild className="w-full">
+                <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>Sign up</Link>
+              </Button>
+            </div>
+          </SignedOut>
         </div>
       )}
     </nav>
