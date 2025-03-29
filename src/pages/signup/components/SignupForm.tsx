@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +19,21 @@ const SignupForm = () => {
   const [password, setPassword] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  const handleResendVerification = async () => {
+    try {
+      setIsLoading(true);
+      await signUp.prepareEmailAddressVerification();
+      toast.success("Verification code sent. Please check your email.");
+      setVerificationSent(true);
+    } catch (error: any) {
+      console.error("Error resending verification:", error);
+      toast.error("Failed to send verification code. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,24 +48,78 @@ const SignupForm = () => {
     try {
       setIsLoading(true);
       
+      // First create the signup
       const result = await signUp.create({
         emailAddress: email,
         password,
-        firstName,
-        lastName,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
       });
+
+      console.log("Signup result:", result);
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         toast.success("Account created successfully");
         navigate("/dashboard");
+      } else if (result.status === "missing_requirements") {
+        // Handle email verification
+        const emailVerification = result.verifications.emailAddress;
+        console.log("Email verification status:", emailVerification);
+
+        if (emailVerification) {
+          // Prepare verification
+          await signUp.prepareEmailAddressVerification();
+          
+          toast.info(
+            <div className="space-y-2">
+              <p>Please check your email for a verification code.</p>
+              <p className="text-sm">Email: {email}</p>
+              <p className="text-sm">Check your spam folder if you don't see it.</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleResendVerification}
+                disabled={isLoading}
+                className="mt-2"
+              >
+                Resend verification code
+              </Button>
+            </div>,
+            { duration: 15000 }
+          );
+        } else {
+          console.log("Missing verification requirements:", result.verifications);
+          toast.error("Unable to start verification process. Please try again.");
+        }
       } else {
-        console.log("Signup requires further action", result);
-        toast.info("Please check your email to verify your account");
+        console.log("Unexpected signup status:", result.status);
+        toast.error("An unexpected error occurred. Please try again.");
       }
     } catch (error: any) {
       console.error("Error during signup:", error);
-      toast.error(error.errors?.[0]?.message || "An error occurred during signup");
+      
+      // Log the full error for debugging
+      console.log("Full error object:", error);
+      
+      if (error.errors && error.errors.length > 0) {
+        const errorMessage = error.errors[0].message;
+        console.log("Error message:", errorMessage);
+        
+        if (errorMessage.includes("email")) {
+          toast.error("Please enter a valid email address");
+        } else if (errorMessage.includes("password")) {
+          toast.error("Password must be at least 8 characters long");
+        } else if (errorMessage.includes("already exists")) {
+          toast.error("An account with this email already exists");
+        } else if (errorMessage.includes("verification")) {
+          toast.error("There was an issue with email verification. Please try again.");
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        toast.error("An error occurred during signup. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

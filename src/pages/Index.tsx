@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { ArrowRight, ShieldCheck, Bot, RefreshCw, Check, FileText, BarChart, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,9 @@ import FeatureCard from '@/components/FeatureCard';
 import PricingCard from '@/components/PricingCard';
 import FeatureShowcase from '@/components/FeatureShowcase';
 import { Link } from 'react-router-dom';
+import DashboardPreview from '@/components/DashboardPreview';
+import AdvancedFeaturesPreview from '@/components/AdvancedFeaturesPreview';
+import HumanizedTextPreview from '@/components/HumanizedTextPreview';
 
 const Index = () => {
   useEffect(() => {
@@ -71,18 +73,7 @@ const Index = () => {
       {/* Main Application Preview */}
       <section className="py-16 px-6 bg-brand-lightGray">
         <div className="max-w-6xl mx-auto relative reveal">
-          <div className="w-full h-[500px] md:h-[600px] bg-gray-200 rounded-2xl overflow-hidden shadow-2xl">
-            {/* This would be a screenshot or demo video of the application */}
-            <div className="w-full h-full bg-gradient-to-br from-primary/80 via-primary to-blue-500 flex items-center justify-center text-white">
-              <div className="p-8 text-center">
-                <h3 className="text-2xl font-bold mb-4">Application Preview</h3>
-                <p className="text-white/80 mb-6">Interactive demo of WriteGenuine in action</p>
-                <Button variant="secondary" size="lg">
-                  Watch Demo
-                </Button>
-              </div>
-            </div>
-          </div>
+          <DashboardPreview />
         </div>
       </section>
       
@@ -134,7 +125,9 @@ const Index = () => {
           </p>
         </div>
         
-        <FeatureShowcase />
+        <div className="max-w-4xl mx-auto">
+          <HumanizedTextPreview />
+        </div>
       </section>
       
       {/* Secondary Features */}
@@ -173,12 +166,7 @@ const Index = () => {
             </div>
             
             <div className="bg-muted/50 rounded-2xl overflow-hidden h-[500px] relative">
-              {/* Advanced features illustration/screenshot */}
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-                <div className="w-4/5 aspect-video bg-white rounded-lg shadow-lg flex items-center justify-center">
-                  <p className="text-muted-foreground">Advanced Dashboard Preview</p>
-                </div>
-              </div>
+              <AdvancedFeaturesPreview />
             </div>
           </div>
         </div>
