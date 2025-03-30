@@ -66,7 +66,7 @@ const Dashboard = () => {
     setText((prev) => ({ ...prev, [tab]: value }));
   };
 
-  // Plagiarism check using Perplexity API
+  // Plagiarism check using Google Gemini API
   const handlePlagiarismCheck = async () => {
     if (!text.plagiarism.trim()) {
       toast.error('Please enter some text to check for plagiarism');
@@ -76,9 +76,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, plagiarism: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_GEMINI_API_KEY to your .env file');
         return;
       }
       
@@ -86,45 +86,47 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3-sonar-small-32k-online",
-          messages: [
+          contents: [
             {
-              role: "system",
-              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+              parts: [
+                {
+                  text: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
 
-              Since you don't have direct web search capabilities, simulate a plagiarism check by:
-              1. Identifying common phrases, quotes, or passages that might appear in other sources
-              2. Evaluating the originality of ideas and expressions
-              3. Looking for distinctive academic or professional writing patterns
-              
-              After analysis, provide a JSON response with these fields:
-              - originalityScore: a number between 0 and 100 representing how original the text appears
-              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
-              - sources: an array of simulated matching sources, each with:
-                * url: a plausible website URL where similar content might be found
-                * title: a plausible title for the source
-                * similarity: a percentage (0-100) indicating how similar this source is
-                * matchedText: a brief excerpt showing what text might match
-              - summary: a brief explanation of your reasoning (max 150 words)
-              
-              Include 1-3 simulated sources for demonstration purposes.
-              
-              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
-            },
-            {
-              role: "user",
-              content: text.plagiarism
+                  Since you don't have direct web search capabilities, simulate a plagiarism check by:
+                  1. Identifying common phrases, quotes, or passages that might appear in other sources
+                  2. Evaluating the originality of ideas and expressions
+                  3. Looking for distinctive academic or professional writing patterns
+                  
+                  After analysis, provide a JSON response with these fields:
+                  - originalityScore: a number between 0 and 100 representing how original the text appears
+                  - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+                  - sources: an array of simulated matching sources, each with:
+                    * url: a plausible website URL where similar content might be found
+                    * title: a plausible title for the source
+                    * similarity: a percentage (0-100) indicating how similar this source is
+                    * matchedText: a brief excerpt showing what text might match
+                  - summary: a brief explanation of your reasoning (max 150 words)
+                  
+                  Include 1-3 simulated sources for demonstration purposes.
+                  
+                  IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.
+                  
+                  Text to analyze:
+                  ${text.plagiarism}`
+                }
+              ]
             }
           ],
-          temperature: 0.2,
-          max_tokens: 1000,
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1000,
+          },
         }),
         signal: controller.signal
       });
@@ -140,17 +142,23 @@ const Dashboard = () => {
 
       const data = await response.json();
       
-      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+      if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
         console.error('Invalid API response:', data);
         throw new Error('API response format is unexpected');
       }
       
-      const responseContent = data.choices[0].message.content;
+      const responseContent = data.candidates[0].content.parts[0].text;
       console.log('Raw plagiarism check API response:', responseContent);
       
       // Parse the JSON response
       try {
-        const parsedResult = JSON.parse(responseContent);
+        // Extract JSON from the response if it's wrapped in markdown code blocks
+        const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
+                          responseContent.match(/```\n([\s\S]*)\n```/) || 
+                          [null, responseContent];
+        const jsonContent = jsonMatch[1].trim();
+        
+        const parsedResult = JSON.parse(jsonContent);
         
         // Validate the parsed result has the expected properties
         if (!('originalityScore' in parsedResult) || !('summary' in parsedResult)) {
@@ -172,9 +180,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your Perplexity API key');
-      } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your Perplexity API key');
+        toast.error('API key issue: Please check your Google Gemini API key');
+      } else if (error.message?.includes('status 401') || error.message?.includes('status 403')) {
+        toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
@@ -185,7 +193,7 @@ const Dashboard = () => {
     }
   };
 
-  // AI detection using Perplexity API
+  // AI detection using Google Gemini API
   const handleDetection = async () => {
     if (!text.detection.trim()) {
       toast.error('Please enter some text to analyze');
@@ -195,9 +203,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, detection: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_GEMINI_API_KEY to your .env file');
         return;
       }
       
@@ -205,38 +213,40 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3-sonar-small-32k-online",
-          messages: [
+          contents: [
             {
-              role: "system",
-              content: `You are an AI text detection expert. Your task is to analyze the given text and determine whether it was written by a human or generated by AI.
-              
-              Follow this process:
-              1. Analyze the text for patterns typical of AI generation (repetition, generic phrasing, unnatural transitions)
-              2. Look for human-like elements (personal anecdotes, unique perspectives, creative language)
-              3. Consider complexity, randomness, and unpredictability of the writing
-              
-              After analysis, provide a JSON response with these fields:
-              - aiProbability: a number between 0 and 100 representing the probability the text was AI-generated
-              - humanProbability: a number between 0 and 100 (should be 100 - aiProbability)
-              - analysis: a brief explanation (max 150 words) of your reasoning
-              
-              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
-            },
-            {
-              role: "user",
-              content: text.detection
+              parts: [
+                {
+                  text: `You are an AI text detection expert. Your task is to analyze the given text and determine whether it was written by a human or generated by AI.
+                  
+                  Follow this process:
+                  1. Analyze the text for patterns typical of AI generation (repetition, generic phrasing, unnatural transitions)
+                  2. Look for human-like elements (personal anecdotes, unique perspectives, creative language)
+                  3. Consider complexity, randomness, and unpredictability of the writing
+                  
+                  After analysis, provide a JSON response with these fields:
+                  - aiProbability: a number between 0 and 100 representing the probability the text was AI-generated
+                  - humanProbability: a number between 0 and 100 (should be 100 - aiProbability)
+                  - analysis: a brief explanation (max 150 words) of your reasoning
+                  
+                  IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.
+                  
+                  Text to analyze:
+                  ${text.detection}`
+                }
+              ]
             }
           ],
-          temperature: 0.1,
-          max_tokens: 500,
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 800,
+          },
         }),
         signal: controller.signal
       });
@@ -252,17 +262,23 @@ const Dashboard = () => {
 
       const data = await response.json();
       
-      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+      if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
         console.error('Invalid API response:', data);
         throw new Error('API response format is unexpected');
       }
       
-      const responseContent = data.choices[0].message.content;
+      const responseContent = data.candidates[0].content.parts[0].text;
       console.log('Raw API response:', responseContent);
       
       // Parse the JSON response
       try {
-        const parsedResult = JSON.parse(responseContent);
+        // Extract JSON from the response if it's wrapped in markdown code blocks
+        const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
+                          responseContent.match(/```\n([\s\S]*)\n```/) || 
+                          [null, responseContent];
+        const jsonContent = jsonMatch[1].trim();
+        
+        const parsedResult = JSON.parse(jsonContent);
         
         // Validate the parsed result has the expected properties
         if (!('aiProbability' in parsedResult) || !('humanProbability' in parsedResult) || !('analysis' in parsedResult)) {
@@ -292,9 +308,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your Perplexity API key');
-      } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your Perplexity API key');
+        toast.error('API key issue: Please check your Google Gemini API key');
+      } else if (error.message?.includes('status 401') || error.message?.includes('status 403')) {
+        toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
@@ -347,7 +363,7 @@ const Dashboard = () => {
     return prompts[style as keyof typeof prompts] || prompts.natural;
   };
 
-  // Humanize text using Perplexity API
+  // Humanize text using Google Gemini API
   const handleHumanize = async () => {
     if (!text.humanize.trim()) {
       toast.error('Please enter some text to humanize');
@@ -357,9 +373,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, humanize: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_GEMINI_API_KEY to your .env file');
         return;
       }
       
@@ -367,26 +383,28 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3-sonar-small-32k-online",
-          messages: [
+          contents: [
             {
-              role: "system",
-              content: getHumanizeSystemPrompt(humanizeStyle)
-            },
-            {
-              role: "user",
-              content: text.humanize
+              parts: [
+                {
+                  text: `${getHumanizeSystemPrompt(humanizeStyle)}
+                  
+                  Text to humanize:
+                  ${text.humanize}`
+                }
+              ]
             }
           ],
-          temperature: 0.7,
-          max_tokens: 1000,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1500,
+          },
         }),
         signal: controller.signal
       });
@@ -402,12 +420,13 @@ const Dashboard = () => {
 
       const data = await response.json();
       
-      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+      if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
         console.error('Invalid API response:', data);
         throw new Error('API response format is unexpected');
       }
       
-      const humanizedText = data.choices[0].message.content;
+      const humanizedText = data.candidates[0].content.parts[0].text;
+      console.log('Humanized text received');
       
       // Add fake delay for better UX
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -426,9 +445,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your Perplexity API key');
-      } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your Perplexity API key');
+        toast.error('API key issue: Please check your Google Gemini API key');
+      } else if (error.message?.includes('status 401') || error.message?.includes('status 403')) {
+        toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
