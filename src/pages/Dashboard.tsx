@@ -66,7 +66,7 @@ const Dashboard = () => {
     setText((prev) => ({ ...prev, [tab]: value }));
   };
 
-  // Plagiarism check using DeepSeek API
+  // Plagiarism check using Perplexity API
   const handlePlagiarismCheck = async () => {
     if (!text.plagiarism.trim()) {
       toast.error('Please enter some text to check for plagiarism');
@@ -76,9 +76,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, plagiarism: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
         return;
       }
       
@@ -86,14 +86,14 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: "llama-3-sonar-small-32k-online",
           messages: [
             {
               role: "system",
@@ -172,9 +172,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your DeepSeek API key');
+        toast.error('API key issue: Please check your Perplexity API key');
       } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your DeepSeek API key');
+        toast.error('Authentication failed: Please check your Perplexity API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
@@ -185,7 +185,7 @@ const Dashboard = () => {
     }
   };
 
-  // AI detection using DeepSeek API
+  // AI detection using Perplexity API
   const handleDetection = async () => {
     if (!text.detection.trim()) {
       toast.error('Please enter some text to analyze');
@@ -195,9 +195,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, detection: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
         return;
       }
       
@@ -205,14 +205,14 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: "llama-3-sonar-small-32k-online",
           messages: [
             {
               role: "system",
@@ -292,9 +292,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your DeepSeek API key');
+        toast.error('API key issue: Please check your Perplexity API key');
       } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your DeepSeek API key');
+        toast.error('Authentication failed: Please check your Perplexity API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
@@ -347,7 +347,7 @@ const Dashboard = () => {
     return prompts[style as keyof typeof prompts] || prompts.natural;
   };
 
-  // Humanize text using DeepSeek API
+  // Humanize text using Perplexity API
   const handleHumanize = async () => {
     if (!text.humanize.trim()) {
       toast.error('Please enter some text to humanize');
@@ -357,9 +357,9 @@ const Dashboard = () => {
     setIsLoading((prev) => ({ ...prev, humanize: true }));
     try {
       // Check if API key is available
-      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      const apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY;
       if (!apiKey) {
-        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        toast.error('API key is missing. Please add VITE_PERPLEXITY_API_KEY to your .env file');
         return;
       }
       
@@ -367,14 +367,14 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
+          model: "llama-3-sonar-small-32k-online",
           messages: [
             {
               role: "system",
@@ -426,9 +426,9 @@ const Dashboard = () => {
       if (error.name === 'AbortError') {
         toast.error('Request timed out. Please try again');
       } else if (error.message?.includes('API key')) {
-        toast.error('API key issue: Please check your DeepSeek API key');
+        toast.error('API key issue: Please check your Perplexity API key');
       } else if (error.message?.includes('status 401')) {
-        toast.error('Authentication failed: Please check your DeepSeek API key');
+        toast.error('Authentication failed: Please check your Perplexity API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
       } else {
