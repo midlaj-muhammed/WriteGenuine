@@ -10,6 +10,9 @@ import { Link } from 'react-router-dom';
 import DashboardPreview from '@/components/DashboardPreview';
 import AdvancedFeaturesPreview from '@/components/AdvancedFeaturesPreview';
 import HumanizedTextPreview from '@/components/HumanizedTextPreview';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PlagiarismChecker from '@/components/PlagiarismChecker';
+import AIDetectionTool from '@/components/AIDetectionTool';
 
 const Index = () => {
   useEffect(() => {
@@ -121,12 +124,27 @@ const Index = () => {
             Powerful Tools in Action
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            See how our suite of tools can help you create authentic, high-quality content.
+            Try our suite of tools to create authentic, high-quality content.
           </p>
         </div>
         
         <div className="max-w-4xl mx-auto">
-          <HumanizedTextPreview />
+          <Tabs defaultValue="humanizer" className="w-full">
+            <TabsList className="grid grid-cols-3 mb-8">
+              <TabsTrigger value="plagiarism">Plagiarism Checker</TabsTrigger>
+              <TabsTrigger value="detection">AI Detection</TabsTrigger>
+              <TabsTrigger value="humanizer">AI Humanizer</TabsTrigger>
+            </TabsList>
+            <TabsContent value="plagiarism">
+              <PlagiarismChecker />
+            </TabsContent>
+            <TabsContent value="detection">
+              <AIDetectionTool />
+            </TabsContent>
+            <TabsContent value="humanizer">
+              <HumanizedTextPreview />
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
       

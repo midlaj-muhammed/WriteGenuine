@@ -17,19 +17,55 @@ const SignupForm = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
 
   const handleResendVerification = async () => {
+    if (!signUp) return;
     try {
       setIsLoading(true);
-      await signUp.prepareEmailAddressVerification();
-      toast.success("Verification code sent. Please check your email.");
-      setVerificationSent(true);
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      toast.success("Verification code sent. Please check your email (including spam folder).");
     } catch (error: any) {
       console.error("Error resending verification:", error);
       toast.error("Failed to send verification code. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signUp || !code.trim()) {
+      toast.error("Please enter the verification code");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code,
+      });
+      
+      if (completeSignUp.status !== "complete") {
+        console.log("Verification response:", completeSignUp);
+        toast.error("Verification failed. Please try again.");
+        return;
+      }
+      
+      if (completeSignUp.status === "complete") {
+        await setActive({ session: completeSignUp.createdSessionId });
+        toast.success("Account verified successfully!");
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      console.error("Error during verification:", error);
+      const errorMessage = error.errors?.[0]?.message || "Failed to verify email";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -45,66 +81,41 @@ const SignupForm = () => {
       return;
     }
 
+    if (!email || !password) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
     try {
       setIsLoading(true);
       
-      // First create the signup
-      const result = await signUp.create({
+      // Start the sign-up process
+      const signUpAttempt = await signUp.create({
         emailAddress: email,
         password,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
       });
 
-      console.log("Signup result:", result);
+      // After sign up, prepare email verification
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      
+      // Show verification UI
+      setShowVerification(true);
+      setPendingVerification(true);
+      
+      toast.info(
+        <div className="space-y-2">
+          <p>Please check your email for a verification code.</p>
+          <p className="text-sm">Email: {email}</p>
+          <p className="text-sm">Check your spam folder if you don't see it.</p>
+        </div>,
+        { duration: 15000 }
+      );
 
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        toast.success("Account created successfully");
-        navigate("/dashboard");
-      } else if (result.status === "missing_requirements") {
-        // Handle email verification
-        const emailVerification = result.verifications.emailAddress;
-        console.log("Email verification status:", emailVerification);
-
-        if (emailVerification) {
-          // Prepare verification
-          await signUp.prepareEmailAddressVerification();
-          
-          toast.info(
-            <div className="space-y-2">
-              <p>Please check your email for a verification code.</p>
-              <p className="text-sm">Email: {email}</p>
-              <p className="text-sm">Check your spam folder if you don't see it.</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleResendVerification}
-                disabled={isLoading}
-                className="mt-2"
-              >
-                Resend verification code
-              </Button>
-            </div>,
-            { duration: 15000 }
-          );
-        } else {
-          console.log("Missing verification requirements:", result.verifications);
-          toast.error("Unable to start verification process. Please try again.");
-        }
-      } else {
-        console.log("Unexpected signup status:", result.status);
-        toast.error("An unexpected error occurred. Please try again.");
-      }
     } catch (error: any) {
       console.error("Error during signup:", error);
       
-      // Log the full error for debugging
-      console.log("Full error object:", error);
-      
       if (error.errors && error.errors.length > 0) {
         const errorMessage = error.errors[0].message;
-        console.log("Error message:", errorMessage);
         
         if (errorMessage.includes("email")) {
           toast.error("Please enter a valid email address");
@@ -112,8 +123,6 @@ const SignupForm = () => {
           toast.error("Password must be at least 8 characters long");
         } else if (errorMessage.includes("already exists")) {
           toast.error("An account with this email already exists");
-        } else if (errorMessage.includes("verification")) {
-          toast.error("There was an issue with email verification. Please try again.");
         } else {
           toast.error(errorMessage);
         }
@@ -134,74 +143,114 @@ const SignupForm = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        {!showVerification ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First name</Label>
+                <Input 
+                  id="firstName" 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last name</Label>
+                <Input 
+                  id="lastName" 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
               <Input 
-                id="firstName" 
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                id="email" 
+                type="email" 
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
+              <Label htmlFor="password">Password <span className="text-red-500">*</span></Label>
               <Input 
-                id="lastName" 
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                id="password" 
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+                minLength={8}
+              />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 8 characters long
+              </p>
+            </div>
+            
+            <TermsCheckbox 
+              checked={termsAccepted}
+              onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+              disabled={isLoading}
+            />
+            
+            <Button className="w-full" type="submit" disabled={isLoading || !termsAccepted}>
+              {isLoading ? "Creating account..." : "Sign Up"}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerification} className="space-y-4">
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-medium">Verify your email</h3>
+              <p className="text-sm text-muted-foreground">
+                We've sent a verification code to {email}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="code">Verification Code</Label>
+              <Input 
+                id="code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Enter verification code"
                 disabled={isLoading}
                 required
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <Button className="w-full" type="submit" disabled={isLoading}>
+              {isLoading ? "Verifying..." : "Verify Email"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleResendVerification}
               disabled={isLoading}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input 
-              id="password" 
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-          </div>
-          
-          <TermsCheckbox 
-            checked={termsAccepted}
-            onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-            disabled={isLoading}
-          />
-          
-          <Button className="w-full" type="submit" disabled={isLoading || !termsAccepted}>
-            {isLoading ? "Creating account..." : "Sign Up"}
-          </Button>
-        </form>
+            >
+              Resend Code
+            </Button>
+          </form>
+        )}
         
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">or continue with</span>
-          </div>
-        </div>
-        
-        <OAuthButtons isLoading={isLoading} />
+        {!showVerification && (
+          <>
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">or continue with</span>
+              </div>
+            </div>
+            
+            <OAuthButtons isLoading={isLoading} />
+          </>
+        )}
       </CardContent>
       <CardFooter className="flex justify-center">
         <div className="text-sm text-muted-foreground">

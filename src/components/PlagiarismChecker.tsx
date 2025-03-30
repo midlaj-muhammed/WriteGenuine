@@ -1,0 +1,230 @@
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
+
+interface Source {
+  url: string;
+  title: string;
+  similarity: number;
+  matchedText: string;
+}
+
+interface PlagiarismResult {
+  originalityScore: number;
+  plagiarismScore: number;
+  sources: Source[];
+  summary: string;
+}
+
+const PlagiarismChecker = () => {
+  const [inputText, setInputText] = useState('');
+  const [result, setResult] = useState<PlagiarismResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleCheck = async () => {
+    if (!inputText.trim()) {
+      toast.error('Please enter some text to check for plagiarism');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "system",
+              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+
+              Since you don't have direct web search capabilities, simulate a plagiarism check by:
+              1. Identifying common phrases, quotes, or passages that might appear in other sources
+              2. Evaluating the originality of ideas and expressions
+              3. Looking for distinctive academic or professional writing patterns
+              
+              After analysis, provide a JSON response with these fields:
+              - originalityScore: a number between 0 and 100 representing how original the text appears
+              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+              - sources: an array of simulated matching sources, each with:
+                * url: a plausible website URL where similar content might be found
+                * title: a plausible title for the source
+                * similarity: a percentage (0-100) indicating how similar this source is
+                * matchedText: a brief excerpt showing what text might match
+              - summary: a brief explanation of your reasoning (max 150 words)
+              
+              Include 1-3 simulated sources for demonstration purposes.
+              
+              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
+            },
+            {
+              role: "user",
+              content: inputText
+            }
+          ],
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check plagiarism');
+      }
+
+      const data = await response.json();
+      const responseContent = data.choices[0].message.content;
+      
+      // Parse the JSON response
+      try {
+        const parsedResult = JSON.parse(responseContent);
+        setResult(parsedResult);
+        toast.success('Plagiarism check complete');
+      } catch (error) {
+        console.error('Failed to parse AI response:', responseContent);
+        toast.error('Failed to parse plagiarism check result');
+      }
+    } catch (error) {
+      console.error('Error checking plagiarism:', error);
+      toast.error('Failed to check plagiarism. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 70) return 'text-green-500';
+    if (score >= 30) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getProgressColor = (score: number) => {
+    if (score >= 70) return 'bg-green-500';
+    if (score >= 30) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getSeverityLabel = (originalityScore: number) => {
+    if (originalityScore >= 70) return 'Highly Original';
+    if (originalityScore >= 30) return 'Partially Original';
+    return 'Possible Plagiarism';
+  };
+
+  return (
+    <div className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden">
+      {/* Header */}
+      <div className="bg-primary/5 border-b p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-primary">Plagiarism Checker</h3>
+          <div className="flex items-center space-x-2">
+            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+            <span className="text-sm text-muted-foreground">Powered by DeepSeek</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-6 space-y-6">
+        {/* Input Section */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Text to Check</label>
+          <Textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Enter the text you want to check for plagiarism..."
+            className="min-h-[150px]"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            For best results, enter at least 300 characters.
+          </p>
+        </div>
+
+        {/* Action Button */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleCheck}
+            disabled={isLoading || !inputText.trim()}
+            className="gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4" />
+                Check for Plagiarism
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Results Section */}
+        {result && (
+          <div className="mt-6 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium">Originality Score</label>
+                <div className={`text-lg font-bold ${getScoreColor(result.originalityScore)}`}>
+                  {result.originalityScore}%
+                </div>
+              </div>
+              <Progress value={result.originalityScore} className={`h-2 ${getProgressColor(result.originalityScore)}`} />
+              <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                <span>Low Originality</span>
+                <span>{getSeverityLabel(result.originalityScore)}</span>
+                <span>High Originality</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Analysis</label>
+              <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                {result.summary}
+              </div>
+            </div>
+
+            {result.sources && result.sources.length > 0 && (
+              <div className="space-y-4">
+                <label className="block text-sm font-medium">Potential Sources</label>
+                {result.sources.map((source, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">{source.title}</h4>
+                      <span className={`text-sm font-medium ${source.similarity > 50 ? 'text-red-500' : 'text-yellow-500'}`}>
+                        {source.similarity}% match
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                    <div className="bg-yellow-50 p-2 text-xs rounded border border-yellow-200 mt-2">
+                      "{source.matchedText}"
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-start space-x-3 text-sm bg-blue-50 p-4 rounded-lg">
+              <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-700">Disclaimer</p>
+                <p className="text-blue-600 mt-1">
+                  This is a simulated plagiarism check. For academic or professional use, we recommend verifying with multiple tools and comprehensive checks.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default PlagiarismChecker; 

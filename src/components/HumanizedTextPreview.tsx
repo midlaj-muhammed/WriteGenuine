@@ -112,7 +112,7 @@ const HumanizedTextPreview = () => {
           <h3 className="font-semibold text-primary">AI Text Humanizer</h3>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-sm text-muted-foreground">Powered by DeepSeek</span>
+            <span className="text-sm text-muted-foreground">Powered by WriteGenuine</span>
           </div>
         </div>
       </div>

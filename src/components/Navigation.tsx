@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,6 +9,7 @@ const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { signOut } = useClerk();
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,8 +24,26 @@ const Navigation = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Handle hash links and scroll to the corresponding section
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location]);
+
   const handleSignOut = () => {
     signOut();
+  };
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -46,8 +64,8 @@ const Navigation = () => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">
-          <NavLink to="/#features">Features</NavLink>
-          <NavLink to="/#pricing">Pricing</NavLink>
+          <NavLink to="/" onClick={() => scrollToSection('features')}>Features</NavLink>
+          <NavLink to="/" onClick={() => scrollToSection('pricing')}>Pricing</NavLink>
           <NavLink to="/dashboard">Dashboard</NavLink>
           
           <SignedIn>
@@ -85,8 +103,24 @@ const Navigation = () => {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden absolute top-full left-0 right-0 bg-white shadow-lg py-4 px-6 flex flex-col gap-4 animate-slide-in-right">
-          <MobileNavLink to="/#features" onClick={() => setIsMobileMenuOpen(false)}>Features</MobileNavLink>
-          <MobileNavLink to="/#pricing" onClick={() => setIsMobileMenuOpen(false)}>Pricing</MobileNavLink>
+          <MobileNavLink 
+            to="/" 
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              scrollToSection('features');
+            }}
+          >
+            Features
+          </MobileNavLink>
+          <MobileNavLink 
+            to="/" 
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              scrollToSection('pricing');
+            }}
+          >
+            Pricing
+          </MobileNavLink>
           <MobileNavLink to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>Dashboard</MobileNavLink>
           
           <SignedIn>
@@ -115,10 +149,11 @@ const Navigation = () => {
   );
 };
 
-const NavLink = ({ to, children }: { to: string, children: React.ReactNode }) => (
+const NavLink = ({ to, children, onClick }: { to: string, children: React.ReactNode, onClick?: () => void }) => (
   <Link 
     to={to} 
     className="text-foreground/80 hover:text-foreground transition-colors font-medium"
+    onClick={onClick}
   >
     {children}
   </Link>
