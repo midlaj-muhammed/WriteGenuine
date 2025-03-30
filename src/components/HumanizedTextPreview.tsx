@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { humanizeText } from '@/services/freeAIService';
 
 const HumanizedTextPreview = () => {
   const [inputText, setInputText] = useState('');
@@ -17,102 +18,16 @@ const HumanizedTextPreview = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [style, setStyle] = useState('natural');
 
-  const getPrompt = (style: string, text: string) => {
-    const prompts = {
-      natural: `You are an expert content humanizer. Your task is to make the given text sound more natural and human-like while maintaining its meaning. Follow these guidelines:
-1. Use natural transitions between ideas
-2. Vary sentence structure and length
-3. Add appropriate conjunctions and connecting words
-4. Use active voice where possible
-5. Include natural pauses and rhythm
-6. Maintain the original meaning and key points
-7. Add subtle emotional undertones
-8. Use conversational language where appropriate
-9. Avoid repetitive patterns
-10. Keep the tone professional but engaging
-
-Text to humanize:
-${text}`,
-      
-      casual: `You are an expert content humanizer specializing in casual, conversational writing. Your task is to make the given text sound more natural and engaging. Follow these guidelines:
-1. Use everyday language and expressions
-2. Add personal touches and relatable examples
-3. Include conversational transitions
-4. Use contractions naturally
-5. Add friendly, approachable tone
-6. Keep sentences shorter and more direct
-7. Use active voice
-8. Include natural pauses and rhythm
-9. Add subtle humor where appropriate
-10. Maintain the original message while making it more engaging
-
-Text to humanize:
-${text}`,
-      
-      professional: `You are an expert content humanizer specializing in professional writing. Your task is to make the given text sound more polished and business-appropriate. Follow these guidelines:
-1. Use clear, concise language
-2. Maintain formal tone while being engaging
-3. Use professional transitions
-4. Include industry-appropriate terminology
-5. Structure ideas logically
-6. Use active voice
-7. Add appropriate emphasis on key points
-8. Maintain professional rhythm
-9. Include relevant examples
-10. Keep the tone authoritative but approachable
-
-Text to humanize:
-${text}`
-    };
-    return prompts[style as keyof typeof prompts] || prompts.natural;
-  };
-
   const handleHumanize = async () => {
     if (!inputText.trim()) {
       toast.error('Please enter some text to humanize');
       return;
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-      toast.error('API key is missing or invalid. Please check your environment variables.');
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-1.5:generateContent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: getPrompt(style, inputText)
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1500,
-            topP: 0.95,
-            topK: 40
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to humanize text');
-      }
-
-      const data = await response.json();
-      setHumanizedText(data.candidates[0].content.parts[0].text);
+      const result = await humanizeText(inputText, style);
+      setHumanizedText(result);
       toast.success('Text humanized successfully!');
     } catch (error) {
       console.error('Error humanizing text:', error);
@@ -134,7 +49,7 @@ ${text}`
           <h3 className="font-semibold text-primary">AI Text Humanizer</h3>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-sm text-muted-foreground">Powered by Gemini Pro 2.5</span>
+            <span className="text-sm text-muted-foreground">Free Humanizer Tool</span>
           </div>
         </div>
       </div>
