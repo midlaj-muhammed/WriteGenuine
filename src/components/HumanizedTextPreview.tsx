@@ -17,7 +17,7 @@ const HumanizedTextPreview = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [style, setStyle] = useState('natural');
 
-  const getSystemPrompt = (style: string) => {
+  const getPrompt = (style: string, text: string) => {
     const prompts = {
       natural: `You are an expert content humanizer. Your task is to make the given text sound more natural and human-like while maintaining its meaning. Follow these guidelines:
 1. Use natural transitions between ideas
@@ -29,7 +29,10 @@ const HumanizedTextPreview = () => {
 7. Add subtle emotional undertones
 8. Use conversational language where appropriate
 9. Avoid repetitive patterns
-10. Keep the tone professional but engaging`,
+10. Keep the tone professional but engaging
+
+Text to humanize:
+${text}`,
       
       casual: `You are an expert content humanizer specializing in casual, conversational writing. Your task is to make the given text sound more natural and engaging. Follow these guidelines:
 1. Use everyday language and expressions
@@ -41,7 +44,10 @@ const HumanizedTextPreview = () => {
 7. Use active voice
 8. Include natural pauses and rhythm
 9. Add subtle humor where appropriate
-10. Maintain the original message while making it more engaging`,
+10. Maintain the original message while making it more engaging
+
+Text to humanize:
+${text}`,
       
       professional: `You are an expert content humanizer specializing in professional writing. Your task is to make the given text sound more polished and business-appropriate. Follow these guidelines:
 1. Use clear, concise language
@@ -53,7 +59,10 @@ const HumanizedTextPreview = () => {
 7. Add appropriate emphasis on key points
 8. Maintain professional rhythm
 9. Include relevant examples
-10. Keep the tone authoritative but approachable`
+10. Keep the tone authoritative but approachable
+
+Text to humanize:
+${text}`
     };
     return prompts[style as keyof typeof prompts] || prompts.natural;
   };
@@ -66,26 +75,29 @@ const HumanizedTextPreview = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-1.5:generateContent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+          'x-goog-api-key': import.meta.env.VITE_GEMINI_API_KEY,
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: getSystemPrompt(style)
-            },
+          contents: [
             {
               role: "user",
-              content: inputText
+              parts: [
+                {
+                  text: getPrompt(style, inputText)
+                }
+              ]
             }
           ],
-          temperature: 0.7,
-          max_tokens: 1000,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1500,
+            topP: 0.95,
+            topK: 40
+          }
         }),
       });
 
@@ -94,7 +106,7 @@ const HumanizedTextPreview = () => {
       }
 
       const data = await response.json();
-      setHumanizedText(data.choices[0].message.content);
+      setHumanizedText(data.candidates[0].content.parts[0].text);
       toast.success('Text humanized successfully!');
     } catch (error) {
       console.error('Error humanizing text:', error);
@@ -112,13 +124,28 @@ const HumanizedTextPreview = () => {
           <h3 className="font-semibold text-primary">AI Text Humanizer</h3>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-sm text-muted-foreground">Powered by WriteGenuine</span>
+            <span className="text-sm text-muted-foreground">Powered by Gemini Pro 2.5</span>
           </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="p-6 space-y-6">
+        {/* Style Selection */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Writing Style</label>
+          <Select value={style} onValueChange={setStyle}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select writing style" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="natural">Natural & Balanced</SelectItem>
+              <SelectItem value="casual">Casual & Conversational</SelectItem>
+              <SelectItem value="professional">Professional & Formal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Input Section */}
         <div>
           <label className="block text-sm font-medium mb-2">Original Text</label>

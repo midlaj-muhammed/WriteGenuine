@@ -32,45 +32,51 @@ const PlagiarismChecker = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-1.5:generateContent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+          'x-goog-api-key': import.meta.env.VITE_GEMINI_API_KEY,
         },
         body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
-
-              Since you don't have direct web search capabilities, simulate a plagiarism check by:
-              1. Identifying common phrases, quotes, or passages that might appear in other sources
-              2. Evaluating the originality of ideas and expressions
-              3. Looking for distinctive academic or professional writing patterns
-              
-              After analysis, provide a JSON response with these fields:
-              - originalityScore: a number between 0 and 100 representing how original the text appears
-              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
-              - sources: an array of simulated matching sources, each with:
-                * url: a plausible website URL where similar content might be found
-                * title: a plausible title for the source
-                * similarity: a percentage (0-100) indicating how similar this source is
-                * matchedText: a brief excerpt showing what text might match
-              - summary: a brief explanation of your reasoning (max 150 words)
-              
-              Include 1-3 simulated sources for demonstration purposes.
-              
-              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
-            },
+          contents: [
             {
               role: "user",
-              content: inputText
+              parts: [
+                {
+                  text: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+
+                  Since you don't have direct web search capabilities, simulate a plagiarism check by:
+                  1. Identifying common phrases, quotes, or passages that might appear in other sources
+                  2. Evaluating the originality of ideas and expressions
+                  3. Looking for distinctive academic or professional writing patterns
+                  
+                  After analysis, provide a JSON response with these fields:
+                  - originalityScore: a number between 0 and 100 representing how original the text appears
+                  - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+                  - sources: an array of simulated matching sources, each with:
+                    * url: a plausible website URL where similar content might be found
+                    * title: a plausible title for the source
+                    * similarity: a percentage (0-100) indicating how similar this source is
+                    * matchedText: a brief excerpt showing what text might match
+                  - summary: a brief explanation of your reasoning (max 150 words)
+                  
+                  Include 1-3 simulated sources for demonstration purposes.
+                  
+                  IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.
+                  
+                  Text to check:
+                  ${inputText}`
+                }
+              ]
             }
           ],
-          temperature: 0.2,
-          max_tokens: 1000,
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1000,
+            topP: 0.95,
+            topK: 40
+          }
         }),
       });
 
@@ -79,7 +85,7 @@ const PlagiarismChecker = () => {
       }
 
       const data = await response.json();
-      const responseContent = data.choices[0].message.content;
+      const responseContent = data.candidates[0].content.parts[0].text;
       
       // Parse the JSON response
       try {
@@ -124,7 +130,7 @@ const PlagiarismChecker = () => {
           <h3 className="font-semibold text-primary">Plagiarism Checker</h3>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-sm text-muted-foreground">Powered by DeepSeek</span>
+            <span className="text-sm text-muted-foreground">Powered by Gemini Pro 2.5</span>
           </div>
         </div>
       </div>
