@@ -75,11 +75,22 @@ const Dashboard = () => {
 
     setIsLoading((prev) => ({ ...prev, plagiarism: true }));
     try {
+      // Check if API key is available
+      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      if (!apiKey) {
+        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        return;
+      }
+      
+      // Add timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: "deepseek-chat",
@@ -115,27 +126,60 @@ const Dashboard = () => {
           temperature: 0.2,
           max_tokens: 1000,
         }),
+        signal: controller.signal
       });
-
+      
+      clearTimeout(timeoutId);
+      
+      // Handle HTTP errors
       if (!response.ok) {
-        throw new Error('Failed to check plagiarism');
+        const errorBody = await response.text().catch(() => null);
+        console.error('API response error:', response.status, errorBody);
+        throw new Error(`API responded with status ${response.status}: ${errorBody || 'No error body'}`);
       }
 
       const data = await response.json();
+      
+      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+        console.error('Invalid API response:', data);
+        throw new Error('API response format is unexpected');
+      }
+      
       const responseContent = data.choices[0].message.content;
+      console.log('Raw plagiarism check API response:', responseContent);
       
       // Parse the JSON response
       try {
         const parsedResult = JSON.parse(responseContent);
+        
+        // Validate the parsed result has the expected properties
+        if (!('originalityScore' in parsedResult) || !('summary' in parsedResult)) {
+          console.error('Parsed result missing required fields:', parsedResult);
+          throw new Error('API response is missing required fields');
+        }
+        
         setResults((prev) => ({ ...prev, plagiarism: parsedResult }));
         toast.success('Plagiarism check complete');
       } catch (error) {
-        console.error('Failed to parse AI response:', responseContent);
-        toast.error('Failed to parse plagiarism check result');
+        console.error('Failed to parse AI response:', error);
+        console.error('Raw content:', responseContent);
+        toast.error('Failed to parse plagiarism check result. API response was not valid JSON');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking plagiarism:', error);
-      toast.error('Failed to check plagiarism. Please try again.');
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        toast.error('Request timed out. Please try again');
+      } else if (error.message?.includes('API key')) {
+        toast.error('API key issue: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 401')) {
+        toast.error('Authentication failed: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 429')) {
+        toast.error('API rate limit exceeded. Please try again later');
+      } else {
+        toast.error('Failed to check plagiarism. Please try again');
+      }
     } finally {
       setIsLoading((prev) => ({ ...prev, plagiarism: false }));
     }
@@ -150,11 +194,22 @@ const Dashboard = () => {
 
     setIsLoading((prev) => ({ ...prev, detection: true }));
     try {
+      // Check if API key is available
+      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      if (!apiKey) {
+        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        return;
+      }
+      
+      // Add timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: "deepseek-chat",
@@ -183,18 +238,38 @@ const Dashboard = () => {
           temperature: 0.1,
           max_tokens: 500,
         }),
+        signal: controller.signal
       });
-
+      
+      clearTimeout(timeoutId);
+      
+      // Handle HTTP errors
       if (!response.ok) {
-        throw new Error('Failed to analyze text');
+        const errorBody = await response.text().catch(() => null);
+        console.error('API response error:', response.status, errorBody);
+        throw new Error(`API responded with status ${response.status}: ${errorBody || 'No error body'}`);
       }
 
       const data = await response.json();
+      
+      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+        console.error('Invalid API response:', data);
+        throw new Error('API response format is unexpected');
+      }
+      
       const responseContent = data.choices[0].message.content;
+      console.log('Raw API response:', responseContent);
       
       // Parse the JSON response
       try {
         const parsedResult = JSON.parse(responseContent);
+        
+        // Validate the parsed result has the expected properties
+        if (!('aiProbability' in parsedResult) || !('humanProbability' in parsedResult) || !('analysis' in parsedResult)) {
+          console.error('Parsed result missing required fields:', parsedResult);
+          throw new Error('API response is missing required fields');
+        }
+        
         setResults((prev) => ({ 
           ...prev, 
           detection: {
@@ -206,12 +281,25 @@ const Dashboard = () => {
         }));
         toast.success('Analysis complete');
       } catch (error) {
-        console.error('Failed to parse AI response:', responseContent);
-        toast.error('Failed to parse analysis result');
+        console.error('Failed to parse AI response:', error);
+        console.error('Raw content:', responseContent);
+        toast.error('Failed to parse analysis result. API response was not valid JSON');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing text:', error);
-      toast.error('Failed to analyze text. Please try again.');
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        toast.error('Request timed out. Please try again');
+      } else if (error.message?.includes('API key')) {
+        toast.error('API key issue: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 401')) {
+        toast.error('Authentication failed: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 429')) {
+        toast.error('API rate limit exceeded. Please try again later');
+      } else {
+        toast.error('Failed to analyze text. Please try again');
+      }
     } finally {
       setIsLoading((prev) => ({ ...prev, detection: false }));
     }
@@ -268,11 +356,22 @@ const Dashboard = () => {
 
     setIsLoading((prev) => ({ ...prev, humanize: true }));
     try {
+      // Check if API key is available
+      const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      if (!apiKey) {
+        toast.error('API key is missing. Please add VITE_DEEPSEEK_API_KEY to your .env file');
+        return;
+      }
+      
+      // Add timeout for the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: "deepseek-chat",
@@ -289,23 +388,52 @@ const Dashboard = () => {
           temperature: 0.7,
           max_tokens: 1000,
         }),
+        signal: controller.signal
       });
-
+      
+      clearTimeout(timeoutId);
+      
+      // Handle HTTP errors
       if (!response.ok) {
-        throw new Error('Failed to humanize text');
+        const errorBody = await response.text().catch(() => null);
+        console.error('API response error:', response.status, errorBody);
+        throw new Error(`API responded with status ${response.status}: ${errorBody || 'No error body'}`);
       }
 
       const data = await response.json();
+      
+      if (!data || !data.choices || !data.choices[0]?.message?.content) {
+        console.error('Invalid API response:', data);
+        throw new Error('API response format is unexpected');
+      }
+      
+      const humanizedText = data.choices[0].message.content;
+      
+      // Add fake delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       setResults((prev) => ({ 
         ...prev, 
         humanize: {
-          humanizedText: data.choices[0].message.content
+          humanizedText
         }
       }));
       toast.success('Text humanized successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error humanizing text:', error);
-      toast.error('Failed to humanize text. Please try again.');
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        toast.error('Request timed out. Please try again');
+      } else if (error.message?.includes('API key')) {
+        toast.error('API key issue: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 401')) {
+        toast.error('Authentication failed: Please check your DeepSeek API key');
+      } else if (error.message?.includes('status 429')) {
+        toast.error('API rate limit exceeded. Please try again later');
+      } else {
+        toast.error('Failed to humanize text. Please try again');
+      }
     } finally {
       setIsLoading((prev) => ({ ...prev, humanize: false }));
     }
