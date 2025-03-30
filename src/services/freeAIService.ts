@@ -159,11 +159,25 @@ export async function checkPlagiarism(text: string): Promise<{
     const contentDomain = detectContentDomain(normalizedText);
     const relevantSources = generateRelevantSources(contentDomain, extractedPhrases);
     
+    // Calculate base originality score for matching
+    const baseOriginalityScore = calculateOriginalityScore(
+      textStats.uniqueWordRatio,
+      textStats.averageWordLength,
+      textStats.averageSentenceLength,
+      textStats.wordCount
+    );
+    
     // More accurate content matching algorithm to find potential sources
-    const sources = matchContentToSources(normalizedText, extractedPhrases, relevantSources, paragraphAnalysis as any[]);
+    const { sources, sourcedParagraphs } = matchContentToSources(
+      normalizedText, 
+      extractedPhrases, 
+      relevantSources, 
+      paragraphAnalysis as any[],
+      baseOriginalityScore
+    );
     
     // Recalculate the overall originality score based on the source matches and paragraph analysis
-    const originalityScores = (paragraphAnalysis as any[]).map(p => p.originalityScore);
+    const originalityScores = sourcedParagraphs.map(p => p.originalityScore);
     const weightedOriginalityScore = calculateWeightedScore(originalityScores, textStats);
     const originalityScore = Math.round(weightedOriginalityScore);
     const plagiarismScore = 100 - originalityScore;
@@ -179,7 +193,7 @@ export async function checkPlagiarism(text: string): Promise<{
       plagiarismScore,
       sources,
       summary,
-      paragraphAnalysis: paragraphAnalysis as any,
+      paragraphAnalysis: sourcedParagraphs,
       citationSuggestions,
       contentFingerprint
     };
