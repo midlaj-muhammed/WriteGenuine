@@ -73,13 +73,19 @@ ${text}`
       return;
     }
 
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      toast.error('API key is missing or invalid. Please check your environment variables.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-1.5:generateContent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': import.meta.env.VITE_GEMINI_API_KEY,
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           contents: [
@@ -110,6 +116,10 @@ ${text}`
       toast.success('Text humanized successfully!');
     } catch (error) {
       console.error('Error humanizing text:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+      }
+      
       toast.error('Failed to humanize text. Please try again.');
     } finally {
       setIsLoading(false);
