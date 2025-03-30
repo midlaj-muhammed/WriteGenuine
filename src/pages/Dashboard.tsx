@@ -82,9 +82,38 @@ const Dashboard = () => {
         return;
       }
       
+      // Log that we're using the API key (without revealing it)
+      console.log('Using Gemini API key (starts with):', apiKey.substring(0, 5) + '...');
+      
       // Add timeout for the fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const prompt = `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+
+      Since you don't have direct web search capabilities, simulate a plagiarism check by:
+      1. Identifying common phrases, quotes, or passages that might appear in other sources
+      2. Evaluating the originality of ideas and expressions
+      3. Looking for distinctive academic or professional writing patterns
+      
+      After analysis, provide a JSON response with these fields:
+      - originalityScore: a number between 0 and 100 representing how original the text appears
+      - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+      - sources: an array of simulated matching sources, each with:
+        * url: a plausible website URL where similar content might be found
+        * title: a plausible title for the source
+        * similarity: a percentage (0-100) indicating how similar this source is
+        * matchedText: a brief excerpt showing what text might match
+      - summary: a brief explanation of your reasoning (max 150 words)
+      
+      Include 1-3 simulated sources for demonstration purposes.
+      
+      IMPORTANT: Return valid JSON with no additional text. Do NOT include markdown code blocks, just the raw JSON.
+      
+      Text to analyze:
+      ${text.plagiarism}`;
+
+      console.log('Sending request to Gemini API for plagiarism check...');
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -96,29 +125,7 @@ const Dashboard = () => {
             {
               parts: [
                 {
-                  text: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
-
-                  Since you don't have direct web search capabilities, simulate a plagiarism check by:
-                  1. Identifying common phrases, quotes, or passages that might appear in other sources
-                  2. Evaluating the originality of ideas and expressions
-                  3. Looking for distinctive academic or professional writing patterns
-                  
-                  After analysis, provide a JSON response with these fields:
-                  - originalityScore: a number between 0 and 100 representing how original the text appears
-                  - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
-                  - sources: an array of simulated matching sources, each with:
-                    * url: a plausible website URL where similar content might be found
-                    * title: a plausible title for the source
-                    * similarity: a percentage (0-100) indicating how similar this source is
-                    * matchedText: a brief excerpt showing what text might match
-                  - summary: a brief explanation of your reasoning (max 150 words)
-                  
-                  Include 1-3 simulated sources for demonstration purposes.
-                  
-                  IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.
-                  
-                  Text to analyze:
-                  ${text.plagiarism}`
+                  text: prompt
                 }
               ]
             }
@@ -141,9 +148,10 @@ const Dashboard = () => {
       }
 
       const data = await response.json();
+      console.log('Received response from Gemini API:', data);
       
       if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-        console.error('Invalid API response:', data);
+        console.error('Invalid API response structure:', data);
         throw new Error('API response format is unexpected');
       }
       
@@ -153,25 +161,75 @@ const Dashboard = () => {
       // Parse the JSON response
       try {
         // Extract JSON from the response if it's wrapped in markdown code blocks
-        const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
-                          responseContent.match(/```\n([\s\S]*)\n```/) || 
-                          [null, responseContent];
-        const jsonContent = jsonMatch[1].trim();
+        let jsonContent = responseContent;
         
-        const parsedResult = JSON.parse(jsonContent);
-        
-        // Validate the parsed result has the expected properties
-        if (!('originalityScore' in parsedResult) || !('summary' in parsedResult)) {
-          console.error('Parsed result missing required fields:', parsedResult);
-          throw new Error('API response is missing required fields');
+        // Try different patterns to extract JSON
+        const jsonBlockPattern = /```(?:json)?\s*([\s\S]*?)\s*```/;
+        const match = responseContent.match(jsonBlockPattern);
+        if (match && match[1]) {
+          jsonContent = match[1].trim();
+          console.log('Extracted JSON from code block');
         }
         
-        setResults((prev) => ({ ...prev, plagiarism: parsedResult }));
+        // Clean the content further if needed
+        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        
+        // Attempt to parse the JSON
+        let parsedResult;
+        try {
+          parsedResult = JSON.parse(jsonContent);
+          console.log('Successfully parsed JSON:', parsedResult);
+        } catch (parseError) {
+          console.error('JSON parse error for content:', jsonContent);
+          console.error('Parse error:', parseError);
+          
+          // Try to fix common JSON issues and retry parsing
+          const fixedJson = jsonContent
+            .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Ensure property names are quoted
+            .replace(/'/g, '"'); // Replace single quotes with double quotes
+          
+          console.log('Attempting to parse fixed JSON:', fixedJson);
+          parsedResult = JSON.parse(fixedJson);
+        }
+        
+        // Validate the parsed result has the expected properties
+        if (!parsedResult) {
+          throw new Error('Failed to parse result into JSON');
+        }
+        
+        // Create a valid result object with defaults for missing fields
+        const validatedResult = {
+          originalityScore: parsedResult.originalityScore || 0,
+          plagiarismScore: parsedResult.plagiarismScore || (100 - (parsedResult.originalityScore || 0)),
+          sources: Array.isArray(parsedResult.sources) ? parsedResult.sources : [],
+          summary: parsedResult.summary || 'No analysis provided'
+        };
+        
+        setResults((prev) => ({ ...prev, plagiarism: validatedResult }));
         toast.success('Plagiarism check complete');
       } catch (error) {
         console.error('Failed to parse AI response:', error);
         console.error('Raw content:', responseContent);
-        toast.error('Failed to parse plagiarism check result. API response was not valid JSON');
+        
+        // Attempt to create a fallback result if parsing fails
+        try {
+          // Extract just the summary using regex if possible
+          const summaryMatch = responseContent.match(/summary["']?\s*:\s*["']([^"']+)["']/i);
+          const summary = summaryMatch ? summaryMatch[1] : 'Unable to extract analysis from response';
+          
+          // Create a fallback result
+          const fallbackResult = {
+            originalityScore: 50, // Default to 50%
+            plagiarismScore: 50,
+            sources: [],
+            summary: summary
+          };
+          
+          setResults((prev) => ({ ...prev, plagiarism: fallbackResult }));
+          toast.success('Plagiarism check complete (with parsing limitations)');
+        } catch (fallbackError) {
+          toast.error('Failed to parse plagiarism check result. Please try again');
+        }
       }
     } catch (error: any) {
       console.error('Error checking plagiarism:', error);
@@ -185,8 +243,10 @@ const Dashboard = () => {
         toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
+      } else if (error.message?.includes('safety settings')) {
+        toast.error('Content was flagged by safety filters. Try different text');
       } else {
-        toast.error('Failed to check plagiarism. Please try again');
+        toast.error('Failed to check plagiarism. Please try again with different text');
       }
     } finally {
       setIsLoading((prev) => ({ ...prev, plagiarism: false }));
@@ -209,9 +269,31 @@ const Dashboard = () => {
         return;
       }
       
+      // Log that we're using the API key (without revealing it)
+      console.log('Using Gemini API key (starts with):', apiKey.substring(0, 5) + '...');
+      
       // Add timeout for the fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const prompt = `You are an AI text detection expert. Your task is to analyze the given text and determine whether it was written by a human or generated by AI.
+      
+      Follow this process:
+      1. Analyze the text for patterns typical of AI generation (repetition, generic phrasing, unnatural transitions)
+      2. Look for human-like elements (personal anecdotes, unique perspectives, creative language)
+      3. Consider complexity, randomness, and unpredictability of the writing
+      
+      After analysis, provide a JSON response with these fields:
+      - aiProbability: a number between 0 and 100 representing the probability the text was AI-generated
+      - humanProbability: a number between 0 and 100 (should be 100 - aiProbability)
+      - analysis: a brief explanation (max 150 words) of your reasoning
+      
+      IMPORTANT: Return valid JSON with no additional text. Do NOT include markdown code blocks, just the raw JSON.
+      
+      Text to analyze:
+      ${text.detection}`;
+
+      console.log('Sending request to Gemini API for AI detection...');
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -223,22 +305,7 @@ const Dashboard = () => {
             {
               parts: [
                 {
-                  text: `You are an AI text detection expert. Your task is to analyze the given text and determine whether it was written by a human or generated by AI.
-                  
-                  Follow this process:
-                  1. Analyze the text for patterns typical of AI generation (repetition, generic phrasing, unnatural transitions)
-                  2. Look for human-like elements (personal anecdotes, unique perspectives, creative language)
-                  3. Consider complexity, randomness, and unpredictability of the writing
-                  
-                  After analysis, provide a JSON response with these fields:
-                  - aiProbability: a number between 0 and 100 representing the probability the text was AI-generated
-                  - humanProbability: a number between 0 and 100 (should be 100 - aiProbability)
-                  - analysis: a brief explanation (max 150 words) of your reasoning
-                  
-                  IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.
-                  
-                  Text to analyze:
-                  ${text.detection}`
+                  text: prompt
                 }
               ]
             }
@@ -261,45 +328,91 @@ const Dashboard = () => {
       }
 
       const data = await response.json();
+      console.log('Received response from Gemini API:', data);
       
       if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-        console.error('Invalid API response:', data);
+        console.error('Invalid API response structure:', data);
         throw new Error('API response format is unexpected');
       }
       
       const responseContent = data.candidates[0].content.parts[0].text;
-      console.log('Raw API response:', responseContent);
+      console.log('Raw AI detection API response:', responseContent);
       
       // Parse the JSON response
       try {
         // Extract JSON from the response if it's wrapped in markdown code blocks
-        const jsonMatch = responseContent.match(/```json\n([\s\S]*)\n```/) || 
-                          responseContent.match(/```\n([\s\S]*)\n```/) || 
-                          [null, responseContent];
-        const jsonContent = jsonMatch[1].trim();
+        let jsonContent = responseContent;
         
-        const parsedResult = JSON.parse(jsonContent);
-        
-        // Validate the parsed result has the expected properties
-        if (!('aiProbability' in parsedResult) || !('humanProbability' in parsedResult) || !('analysis' in parsedResult)) {
-          console.error('Parsed result missing required fields:', parsedResult);
-          throw new Error('API response is missing required fields');
+        // Try different patterns to extract JSON
+        const jsonBlockPattern = /```(?:json)?\s*([\s\S]*?)\s*```/;
+        const match = responseContent.match(jsonBlockPattern);
+        if (match && match[1]) {
+          jsonContent = match[1].trim();
+          console.log('Extracted JSON from code block');
         }
         
-        setResults((prev) => ({ 
-          ...prev, 
-          detection: {
-            score: parsedResult.aiProbability,
-            aiProbability: parsedResult.aiProbability,
-            humanProbability: parsedResult.humanProbability,
-            analysis: parsedResult.analysis
-          }
-        }));
+        // Clean the content further if needed
+        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        
+        // Attempt to parse the JSON
+        let parsedResult;
+        try {
+          parsedResult = JSON.parse(jsonContent);
+          console.log('Successfully parsed JSON:', parsedResult);
+        } catch (parseError) {
+          console.error('JSON parse error for content:', jsonContent);
+          console.error('Parse error:', parseError);
+          
+          // Try to fix common JSON issues and retry parsing
+          const fixedJson = jsonContent
+            .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":') // Ensure property names are quoted
+            .replace(/'/g, '"'); // Replace single quotes with double quotes
+          
+          console.log('Attempting to parse fixed JSON:', fixedJson);
+          parsedResult = JSON.parse(fixedJson);
+        }
+        
+        // Validate the parsed result has the expected properties
+        if (!parsedResult) {
+          throw new Error('Failed to parse result into JSON');
+        }
+        
+        // Create a valid result object with defaults for missing fields
+        const aiProbability = parsedResult.aiProbability || 50;
+        const humanProbability = parsedResult.humanProbability || (100 - aiProbability);
+        
+        const validatedResult = {
+          score: aiProbability,
+          aiProbability: aiProbability,
+          humanProbability: humanProbability,
+          analysis: parsedResult.analysis || 'No detailed analysis provided'
+        };
+        
+        setResults((prev) => ({ ...prev, detection: validatedResult }));
         toast.success('Analysis complete');
       } catch (error) {
         console.error('Failed to parse AI response:', error);
         console.error('Raw content:', responseContent);
-        toast.error('Failed to parse analysis result. API response was not valid JSON');
+        
+        // Attempt to create a fallback result if parsing fails
+        try {
+          // Extract just the analysis using regex if possible
+          const analysisMatch = responseContent.match(/analysis["']?\s*:\s*["']([^"']+)["']/i);
+          const analysis = analysisMatch ? analysisMatch[1] : 'Unable to extract analysis from response';
+          
+          // Create a fallback result
+          const fallbackResult = {
+            score: 50, // Default to 50%
+            aiProbability: 50,
+            humanProbability: 50,
+            analysis: analysis
+          };
+          
+          setResults((prev) => ({ ...prev, detection: fallbackResult }));
+          toast.success('Analysis complete (with parsing limitations)');
+        } catch (fallbackError) {
+          toast.error('Failed to parse analysis result. Please try again');
+        }
       }
     } catch (error: any) {
       console.error('Error analyzing text:', error);
@@ -313,8 +426,10 @@ const Dashboard = () => {
         toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
+      } else if (error.message?.includes('safety settings')) {
+        toast.error('Content was flagged by safety filters. Try different text');
       } else {
-        toast.error('Failed to analyze text. Please try again');
+        toast.error('Failed to analyze text. Please try again with different text');
       }
     } finally {
       setIsLoading((prev) => ({ ...prev, detection: false }));
@@ -379,9 +494,21 @@ const Dashboard = () => {
         return;
       }
       
+      // Log that we're using the API key (without revealing it)
+      console.log('Using Gemini API key (starts with):', apiKey.substring(0, 5) + '...');
+      
       // Add timeout for the fetch request
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const prompt = `${getHumanizeSystemPrompt(humanizeStyle)}
+      
+      Text to humanize:
+      ${text.humanize}
+      
+      IMPORTANT: Respond with just the humanized text. Do not include explanations, formatting, or additional commentary.`;
+
+      console.log('Sending request to Gemini API for text humanization...');
       
       const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -393,10 +520,7 @@ const Dashboard = () => {
             {
               parts: [
                 {
-                  text: `${getHumanizeSystemPrompt(humanizeStyle)}
-                  
-                  Text to humanize:
-                  ${text.humanize}`
+                  text: prompt
                 }
               ]
             }
@@ -419,14 +543,21 @@ const Dashboard = () => {
       }
 
       const data = await response.json();
+      console.log('Received response from Gemini API:', data);
       
       if (!data || !data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-        console.error('Invalid API response:', data);
+        console.error('Invalid API response structure:', data);
         throw new Error('API response format is unexpected');
       }
       
-      const humanizedText = data.candidates[0].content.parts[0].text;
-      console.log('Humanized text received');
+      // For humanization, we just need the text response, no JSON parsing required
+      let humanizedText = data.candidates[0].content.parts[0].text;
+      console.log('Humanized text received, length:', humanizedText.length);
+      
+      // Clean up the response - remove markdown formatting if present
+      humanizedText = humanizedText
+        .replace(/^```(?:text|markdown)?\s*/g, '')  // Remove opening code blocks
+        .replace(/\s*```$/g, '');                  // Remove closing code blocks
       
       // Add fake delay for better UX
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -450,8 +581,10 @@ const Dashboard = () => {
         toast.error('Authentication failed: Please check your Google Gemini API key');
       } else if (error.message?.includes('status 429')) {
         toast.error('API rate limit exceeded. Please try again later');
+      } else if (error.message?.includes('safety settings')) {
+        toast.error('Content was flagged by safety filters. Try different text');
       } else {
-        toast.error('Failed to humanize text. Please try again');
+        toast.error('Failed to humanize text. Please try again with different text');
       }
     } finally {
       setIsLoading((prev) => ({ ...prev, humanize: false }));
