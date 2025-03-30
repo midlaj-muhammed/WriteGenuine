@@ -4,9 +4,40 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ShieldCheck, Bot, RefreshCw, Copy, Check, FileText, BarChart, AlertTriangle, Info, ChevronRight, Loader2 } from 'lucide-react';
+import { ShieldCheck, Bot, RefreshCw, Copy, Check, FileText, BarChart, AlertTriangle, Info, ChevronRight, Loader2, AlertCircle, Search } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
+import { Progress } from "@/components/ui/progress";
+import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Interface for plagiarism checker
+interface Source {
+  url: string;
+  title: string;
+  similarity: number;
+  matchedText: string;
+}
+
+interface PlagiarismResult {
+  originalityScore: number;
+  plagiarismScore: number;
+  sources: Source[];
+  summary: string;
+}
+
+// Interface for AI detection
+interface DetectionResult {
+  score: number;
+  aiProbability: number;
+  humanProbability: number;
+  analysis: string;
+}
+
+// Interface for humanizer
+interface HumanizeResult {
+  humanizedText: string;
+}
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState<{[key: string]: boolean}>({
@@ -19,53 +50,265 @@ const Dashboard = () => {
     detection: '',
     humanize: ''
   });
-  const [results, setResults] = useState<{[key: string]: any}>({
+  const [results, setResults] = useState<{
+    plagiarism: PlagiarismResult | null,
+    detection: DetectionResult | null,
+    humanize: HumanizeResult | null
+  }>({
     plagiarism: null,
     detection: null,
     humanize: null
   });
+  
+  const [humanizeStyle, setHumanizeStyle] = useState('natural');
 
   const handleTextChange = (tab: string, value: string) => {
     setText((prev) => ({ ...prev, [tab]: value }));
   };
 
-  const handleSubmit = (tab: string) => {
-    // Simulate API call
-    setIsLoading((prev) => ({ ...prev, [tab]: true }));
-    
-    setTimeout(() => {
-      let result = null;
-      
-      // Mock results based on the tab
-      if (tab === 'plagiarism') {
-        result = {
-          originalityScore: 78,
-          matches: [
-            { source: 'https://example.com/article1', similarity: 15, text: 'Lorem ipsum dolor sit amet' },
-            { source: 'https://example.org/content2', similarity: 7, text: 'consectetur adipiscing elit' }
-          ]
-        };
-      } else if (tab === 'detection') {
-        result = {
-          aiProbability: 73,
-          humanProbability: 27,
-          patterns: {
-            repetitive: 'High',
-            complexity: 'Low',
-            variability: 'Medium'
-          }
-        };
-      } else if (tab === 'humanize') {
-        result = {
-          originalText: text.humanize,
-          humanizedText: "This is a humanized version of the original text. It maintains the same meaning but uses more natural language patterns, varied sentence structures, and avoids repetitive phrases that are typical of AI-generated content.",
-          humanScore: 92
-        };
+  // Plagiarism check using DeepSeek API
+  const handlePlagiarismCheck = async () => {
+    if (!text.plagiarism.trim()) {
+      toast.error('Please enter some text to check for plagiarism');
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, plagiarism: true }));
+    try {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "system",
+              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+
+              Since you don't have direct web search capabilities, simulate a plagiarism check by:
+              1. Identifying common phrases, quotes, or passages that might appear in other sources
+              2. Evaluating the originality of ideas and expressions
+              3. Looking for distinctive academic or professional writing patterns
+              
+              After analysis, provide a JSON response with these fields:
+              - originalityScore: a number between 0 and 100 representing how original the text appears
+              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+              - sources: an array of simulated matching sources, each with:
+                * url: a plausible website URL where similar content might be found
+                * title: a plausible title for the source
+                * similarity: a percentage (0-100) indicating how similar this source is
+                * matchedText: a brief excerpt showing what text might match
+              - summary: a brief explanation of your reasoning (max 150 words)
+              
+              Include 1-3 simulated sources for demonstration purposes.
+              
+              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
+            },
+            {
+              role: "user",
+              content: text.plagiarism
+            }
+          ],
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check plagiarism');
       }
+
+      const data = await response.json();
+      const responseContent = data.choices[0].message.content;
       
-      setResults((prev) => ({ ...prev, [tab]: result }));
-      setIsLoading((prev) => ({ ...prev, [tab]: false }));
-    }, 2000);
+      // Parse the JSON response
+      try {
+        const parsedResult = JSON.parse(responseContent);
+        setResults((prev) => ({ ...prev, plagiarism: parsedResult }));
+        toast.success('Plagiarism check complete');
+      } catch (error) {
+        console.error('Failed to parse AI response:', responseContent);
+        toast.error('Failed to parse plagiarism check result');
+      }
+    } catch (error) {
+      console.error('Error checking plagiarism:', error);
+      toast.error('Failed to check plagiarism. Please try again.');
+    } finally {
+      setIsLoading((prev) => ({ ...prev, plagiarism: false }));
+    }
+  };
+
+  // AI detection using DeepSeek API
+  const handleDetection = async () => {
+    if (!text.detection.trim()) {
+      toast.error('Please enter some text to analyze');
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, detection: true }));
+    try {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "system",
+              content: `You are an AI text detection expert. Your task is to analyze the given text and determine whether it was written by a human or generated by AI.
+              
+              Follow this process:
+              1. Analyze the text for patterns typical of AI generation (repetition, generic phrasing, unnatural transitions)
+              2. Look for human-like elements (personal anecdotes, unique perspectives, creative language)
+              3. Consider complexity, randomness, and unpredictability of the writing
+              
+              After analysis, provide a JSON response with these fields:
+              - aiProbability: a number between 0 and 100 representing the probability the text was AI-generated
+              - humanProbability: a number between 0 and 100 (should be 100 - aiProbability)
+              - analysis: a brief explanation (max 150 words) of your reasoning
+              
+              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
+            },
+            {
+              role: "user",
+              content: text.detection
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: 500,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze text');
+      }
+
+      const data = await response.json();
+      const responseContent = data.choices[0].message.content;
+      
+      // Parse the JSON response
+      try {
+        const parsedResult = JSON.parse(responseContent);
+        setResults((prev) => ({ 
+          ...prev, 
+          detection: {
+            score: parsedResult.aiProbability,
+            aiProbability: parsedResult.aiProbability,
+            humanProbability: parsedResult.humanProbability,
+            analysis: parsedResult.analysis
+          }
+        }));
+        toast.success('Analysis complete');
+      } catch (error) {
+        console.error('Failed to parse AI response:', responseContent);
+        toast.error('Failed to parse analysis result');
+      }
+    } catch (error) {
+      console.error('Error analyzing text:', error);
+      toast.error('Failed to analyze text. Please try again.');
+    } finally {
+      setIsLoading((prev) => ({ ...prev, detection: false }));
+    }
+  };
+
+  // Get system prompt for humanizing text
+  const getHumanizeSystemPrompt = (style: string) => {
+    const prompts = {
+      natural: `You are an expert content humanizer. Your task is to make the given text sound more natural and human-like while maintaining its meaning. Follow these guidelines:
+1. Use natural transitions between ideas
+2. Vary sentence structure and length
+3. Add appropriate conjunctions and connecting words
+4. Use active voice where possible
+5. Include natural pauses and rhythm
+6. Maintain the original meaning and key points
+7. Add subtle emotional undertones
+8. Use conversational language where appropriate
+9. Avoid repetitive patterns
+10. Keep the tone professional but engaging`,
+      
+      casual: `You are an expert content humanizer specializing in casual, conversational writing. Your task is to make the given text sound more natural and engaging. Follow these guidelines:
+1. Use everyday language and expressions
+2. Add personal touches and relatable examples
+3. Include conversational transitions
+4. Use contractions naturally
+5. Add friendly, approachable tone
+6. Keep sentences shorter and more direct
+7. Use active voice
+8. Include natural pauses and rhythm
+9. Add subtle humor where appropriate
+10. Maintain the original message while making it more engaging`,
+      
+      professional: `You are an expert content humanizer specializing in professional writing. Your task is to make the given text sound more polished and business-appropriate. Follow these guidelines:
+1. Use clear, concise language
+2. Maintain formal tone while being engaging
+3. Use professional transitions
+4. Include industry-appropriate terminology
+5. Structure ideas logically
+6. Use active voice
+7. Add appropriate emphasis on key points
+8. Maintain professional rhythm
+9. Include relevant examples
+10. Keep the tone authoritative but approachable`
+    };
+    return prompts[style as keyof typeof prompts] || prompts.natural;
+  };
+
+  // Humanize text using DeepSeek API
+  const handleHumanize = async () => {
+    if (!text.humanize.trim()) {
+      toast.error('Please enter some text to humanize');
+      return;
+    }
+
+    setIsLoading((prev) => ({ ...prev, humanize: true }));
+    try {
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "system",
+              content: getHumanizeSystemPrompt(humanizeStyle)
+            },
+            {
+              role: "user",
+              content: text.humanize
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to humanize text');
+      }
+
+      const data = await response.json();
+      setResults((prev) => ({ 
+        ...prev, 
+        humanize: {
+          humanizedText: data.choices[0].message.content
+        }
+      }));
+      toast.success('Text humanized successfully!');
+    } catch (error) {
+      console.error('Error humanizing text:', error);
+      toast.error('Failed to humanize text. Please try again.');
+    } finally {
+      setIsLoading((prev) => ({ ...prev, humanize: false }));
+    }
   };
 
   return (
@@ -105,26 +348,92 @@ const Dashboard = () => {
                     value={text.plagiarism}
                     onChange={(e) => handleTextChange('plagiarism', e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    For best results, enter at least 300 characters.
+                  </p>
                 </div>
                 
                 <div className="text-right">
                   <Button 
-                    onClick={() => handleSubmit('plagiarism')} 
+                    onClick={handlePlagiarismCheck} 
                     disabled={isLoading.plagiarism || !text.plagiarism.trim()}
+                    className="gap-2"
                   >
                     {isLoading.plagiarism ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Checking...
                       </>
                     ) : (
-                      'Check Plagiarism'
+                      <>
+                        <Search className="h-4 w-4" />
+                        Check Plagiarism
+                      </>
                     )}
                   </Button>
                 </div>
                 
                 {results.plagiarism && (
-                  <PlagiarismResults results={results.plagiarism} />
+                  <div className="mt-6 space-y-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium">Originality Score</label>
+                        <div className={`text-lg font-bold ${results.plagiarism.originalityScore >= 70 ? 'text-green-500' : results.plagiarism.originalityScore >= 30 ? 'text-yellow-500' : 'text-red-500'}`}>
+                          {results.plagiarism.originalityScore}%
+                        </div>
+                      </div>
+                      <Progress 
+                        value={results.plagiarism.originalityScore} 
+                        className={`h-2 ${results.plagiarism.originalityScore >= 70 ? 'bg-green-500' : results.plagiarism.originalityScore >= 30 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                      />
+                      <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                        <span>Low Originality</span>
+                        <span>
+                          {results.plagiarism.originalityScore >= 70 ? 'Highly Original' : 
+                           results.plagiarism.originalityScore >= 30 ? 'Partially Original' : 
+                           'Possible Plagiarism'}
+                        </span>
+                        <span>High Originality</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Analysis</label>
+                      <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                        {results.plagiarism.summary}
+                      </div>
+                    </div>
+
+                    {results.plagiarism.sources && results.plagiarism.sources.length > 0 && (
+                      <div className="space-y-4">
+                        <label className="block text-sm font-medium">Potential Sources</label>
+                        {results.plagiarism.sources.map((source, index) => (
+                          <div key={index} className="border rounded-lg p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium text-sm">{source.title}</h4>
+                              <span className={`text-sm font-medium ${source.similarity > 50 ? 'text-red-500' : 'text-yellow-500'}`}>
+                                {source.similarity}% match
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                            <div className="bg-yellow-50 p-2 text-xs rounded border border-yellow-200 mt-2">
+                              "{source.matchedText}"
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-start space-x-3 text-sm bg-blue-50 p-4 rounded-lg">
+                      <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-blue-700">Disclaimer</p>
+                        <p className="text-blue-600 mt-1">
+                          This is a simulated plagiarism check. For academic or professional use, we recommend verifying with multiple tools and comprehensive checks.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </ToolCard>
@@ -148,26 +457,72 @@ const Dashboard = () => {
                     value={text.detection}
                     onChange={(e) => handleTextChange('detection', e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    For best results, enter at least 300 characters.
+                  </p>
                 </div>
                 
                 <div className="text-right">
                   <Button 
-                    onClick={() => handleSubmit('detection')} 
+                    onClick={handleDetection} 
                     disabled={isLoading.detection || !text.detection.trim()}
+                    className="gap-2"
                   >
                     {isLoading.detection ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Detecting...
                       </>
                     ) : (
-                      'Detect AI'
+                      <>
+                        <Bot className="h-4 w-4" />
+                        Detect AI
+                      </>
                     )}
                   </Button>
                 </div>
                 
                 {results.detection && (
-                  <DetectionResults results={results.detection} />
+                  <div className="mt-6 space-y-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium">AI Probability</label>
+                        <div className={`text-lg font-bold ${results.detection.score <= 30 ? 'text-green-500' : results.detection.score <= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
+                          {results.detection.score}%
+                        </div>
+                      </div>
+                      <Progress 
+                        value={results.detection.score} 
+                        className={`h-2 ${results.detection.score <= 30 ? 'bg-green-500' : results.detection.score <= 70 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                      />
+                      <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                        <span>Human</span>
+                        <span>
+                          {results.detection.score <= 30 ? 'Likely Human' : 
+                           results.detection.score <= 70 ? 'Uncertain' : 
+                           'Likely AI'}
+                        </span>
+                        <span>AI</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Analysis</label>
+                      <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                        {results.detection.analysis}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 text-sm bg-blue-50 p-4 rounded-lg">
+                      <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-blue-700">Disclaimer</p>
+                        <p className="text-blue-600 mt-1">
+                          This is an experimental tool. Results may not be 100% accurate, especially for shorter texts or highly skilled human writers and AI content.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </ToolCard>
@@ -180,6 +535,20 @@ const Dashboard = () => {
               description="Transform AI text into natural human writing that bypasses detection."
             >
               <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Writing Style</label>
+                  <Select value={humanizeStyle} onValueChange={setHumanizeStyle}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select writing style" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="natural">Natural & Balanced</SelectItem>
+                      <SelectItem value="casual">Casual & Conversational</SelectItem>
+                      <SelectItem value="professional">Professional & Formal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <div>
                   <label htmlFor="humanize-text" className="block text-sm font-medium mb-2">
                     Enter AI-generated text to humanize
@@ -195,22 +564,54 @@ const Dashboard = () => {
                 
                 <div className="text-right">
                   <Button 
-                    onClick={() => handleSubmit('humanize')} 
+                    onClick={handleHumanize} 
                     disabled={isLoading.humanize || !text.humanize.trim()}
+                    className="gap-2"
                   >
                     {isLoading.humanize ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Humanizing...
                       </>
                     ) : (
-                      'Humanize Text'
+                      <>
+                        <RefreshCw className="h-4 w-4" />
+                        Humanize Text
+                      </>
                     )}
                   </Button>
                 </div>
                 
                 {results.humanize && (
-                  <HumanizeResults results={results.humanize} />
+                  <div className="mt-6 space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium">Humanized Text</label>
+                        <div className="flex items-center text-sm text-green-500">
+                          <Check className="h-4 w-4 mr-1" />
+                          <span>Humanized</span>
+                        </div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4 min-h-[100px]">
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{results.humanize.humanizedText}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => {
+                          navigator.clipboard.writeText(results.humanize?.humanizedText || "");
+                          toast.success("Humanized text copied to clipboard");
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy to Clipboard
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </ToolCard>
@@ -251,290 +652,5 @@ const ToolCard = ({
     </CardContent>
   </Card>
 );
-
-const PlagiarismResults = ({ results }: { results: any }) => (
-  <div className="mt-8 space-y-6 animate-fade-in">
-    <div className="p-4 border rounded-lg bg-muted/30">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold text-lg">Originality Score</h3>
-        <div className="text-2xl font-bold">{results.originalityScore}%</div>
-      </div>
-      
-      <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-green-500"
-          style={{ width: `${results.originalityScore}%` }}
-        ></div>
-      </div>
-      
-      <div className="mt-2 flex justify-between text-sm text-muted-foreground">
-        <span>0% Original</span>
-        <span>100% Original</span>
-      </div>
-    </div>
-    
-    {results.matches.length > 0 && (
-      <div>
-        <h3 className="font-semibold text-lg mb-4">Matched Sources ({results.matches.length})</h3>
-        <div className="space-y-4">
-          {results.matches.map((match: any, index: number) => (
-            <div key={index} className="p-4 border rounded-lg">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-yellow-500" />
-                  <span className="font-medium">Match found</span>
-                </div>
-                <span className="text-sm font-semibold bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                  {match.similarity}% Similar
-                </span>
-              </div>
-              <div className="mt-3 p-3 bg-muted/30 rounded text-sm">
-                "{match.text}"
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <a 
-                  href={match.source} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary flex items-center hover:underline"
-                >
-                  View Source <ChevronRight size={14} />
-                </a>
-                <Button variant="outline" size="sm" className="text-xs h-8">
-                  Exclude Match
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
-    
-    <div className="flex justify-end gap-4">
-      <Button variant="outline">
-        <FileText size={16} className="mr-2" />
-        Download Report
-      </Button>
-      <Button variant="secondary">
-        <BarChart size={16} className="mr-2" />
-        Detailed Analysis
-      </Button>
-    </div>
-  </div>
-);
-
-const DetectionResults = ({ results }: { results: any }) => (
-  <div className="mt-8 space-y-6 animate-fade-in">
-    <div className={`p-6 rounded-lg border ${
-      results.aiProbability > 50 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
-    }`}>
-      <div className="flex justify-between items-start">
-        <div>
-          <div className={`text-lg font-semibold ${
-            results.aiProbability > 50 ? 'text-red-700' : 'text-green-700'
-          }`}>
-            {results.aiProbability > 50 ? 'AI-Generated Content Detected' : 'Human-Written Content Detected'}
-          </div>
-          <p className={`text-sm ${
-            results.aiProbability > 50 ? 'text-red-600' : 'text-green-600'
-          }`}>
-            This content appears to be {results.aiProbability > 50 ? 'written by AI' : 'written by a human'}.
-          </p>
-        </div>
-        <div className={`text-3xl font-bold ${
-          results.aiProbability > 50 ? 'text-red-700' : 'text-green-700'
-        }`}>
-          {results.aiProbability}%
-        </div>
-      </div>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="p-4 border rounded-lg">
-        <h3 className="font-semibold mb-3">AI Probability</h3>
-        <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
-          <div 
-            className="h-full bg-red-500"
-            style={{ width: `${results.aiProbability}%` }}
-          ></div>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>0%</span>
-          <span>{results.aiProbability}%</span>
-        </div>
-      </div>
-      
-      <div className="p-4 border rounded-lg">
-        <h3 className="font-semibold mb-3">Human Probability</h3>
-        <div className="w-full h-3 bg-muted rounded-full overflow-hidden mb-2">
-          <div 
-            className="h-full bg-green-500"
-            style={{ width: `${results.humanProbability}%` }}
-          ></div>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>0%</span>
-          <span>{results.humanProbability}%</span>
-        </div>
-      </div>
-    </div>
-    
-    <div className="p-4 border rounded-lg">
-      <h3 className="font-semibold mb-4">Pattern Analysis</h3>
-      <div className="grid grid-cols-3 gap-4">
-        <PatternIndicator 
-          label="Repetitive Patterns" 
-          value={results.patterns.repetitive} 
-          color={results.patterns.repetitive === 'High' ? 'red' : results.patterns.repetitive === 'Medium' ? 'yellow' : 'green'}
-        />
-        <PatternIndicator 
-          label="Complexity" 
-          value={results.patterns.complexity} 
-          color={results.patterns.complexity === 'Low' ? 'red' : results.patterns.complexity === 'Medium' ? 'yellow' : 'green'} 
-        />
-        <PatternIndicator 
-          label="Variability" 
-          value={results.patterns.variability} 
-          color={results.patterns.variability === 'Low' ? 'red' : results.patterns.variability === 'Medium' ? 'yellow' : 'green'} 
-        />
-      </div>
-    </div>
-    
-    <div className="flex justify-end gap-4">
-      <Button variant="outline">
-        <FileText size={16} className="mr-2" />
-        Download Report
-      </Button>
-      <Button variant="secondary">
-        <RefreshCw size={16} className="mr-2" />
-        Humanize Content
-      </Button>
-    </div>
-  </div>
-);
-
-const PatternIndicator = ({ label, value, color }: { label: string, value: string, color: string }) => {
-  const getColorClass = () => {
-    switch (color) {
-      case 'red': return 'bg-red-100 text-red-700';
-      case 'yellow': return 'bg-yellow-100 text-yellow-700';
-      case 'green': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-  
-  return (
-    <div className="p-3 border rounded-lg">
-      <div className="text-sm text-muted-foreground mb-1">{label}</div>
-      <div className="flex justify-between items-center">
-        <span className="font-medium">{value}</span>
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getColorClass()}`}>
-          {value}
-        </span>
-      </div>
-    </div>
-  );
-};
-
-const HumanizeResults = ({ results }: { results: any }) => {
-  const [copied, setCopied] = useState({
-    original: false,
-    humanized: false
-  });
-
-  const handleCopy = (type: 'original' | 'humanized') => {
-    const textToCopy = type === 'original' ? results.originalText : results.humanizedText;
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(prev => ({ ...prev, [type]: true }));
-    setTimeout(() => setCopied(prev => ({ ...prev, [type]: false })), 2000);
-  };
-
-  return (
-    <div className="mt-8 space-y-6 animate-fade-in">
-      <div className="p-4 border border-green-200 rounded-lg bg-green-50">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Check size={18} className="text-green-600" />
-            <span className="font-medium text-green-800">Successfully Humanized</span>
-          </div>
-          <div className="px-3 py-1 bg-green-200 text-green-800 rounded-full text-sm font-medium">
-            {results.humanScore}% Human Score
-          </div>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <h3 className="font-semibold">Original (AI) Text</h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 text-xs"
-              onClick={() => handleCopy('original')}
-            >
-              {copied.original ? (
-                <>
-                  <Check size={14} className="mr-1" /> Copied
-                </>
-              ) : (
-                <>
-                  <Copy size={14} className="mr-1" /> Copy
-                </>
-              )}
-            </Button>
-          </div>
-          <div className="p-4 border rounded-lg bg-muted/30 min-h-[200px] text-sm overflow-auto">
-            <p className="whitespace-pre-wrap">{results.originalText}</p>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <h3 className="font-semibold">Humanized Text</h3>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 text-xs"
-              onClick={() => handleCopy('humanized')}
-            >
-              {copied.humanized ? (
-                <>
-                  <Check size={14} className="mr-1" /> Copied
-                </>
-              ) : (
-                <>
-                  <Copy size={14} className="mr-1" /> Copy
-                </>
-              )}
-            </Button>
-          </div>
-          <div className="p-4 border border-green-200 rounded-lg bg-green-50 min-h-[200px] text-sm overflow-auto">
-            <p className="whitespace-pre-wrap leading-relaxed">{results.humanizedText}</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-4 border rounded-lg bg-blue-50 border-blue-200 flex gap-3">
-        <Info size={20} className="text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800">
-          <p className="font-medium mb-1">About the humanized text</p>
-          <p>This AI-generated content has been transformed to read more naturally with varied sentence structures, conversational elements, and authentic language patterns. The humanized version maintains the original meaning while incorporating subtle language imperfections that typify human writing.</p>
-        </div>
-      </div>
-      
-      <div className="flex justify-end gap-4">
-        <Button variant="outline">
-          <FileText size={16} className="mr-2" />
-          Export Text
-        </Button>
-        <Button variant="secondary">
-          <Bot size={16} className="mr-2" />
-          Verify AI Detection
-        </Button>
-      </div>
-    </div>
-  );
-};
 
 export default Dashboard;
