@@ -1,29 +1,15 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Search, AlertCircle, BookOpen, Copy, ExternalLink, Check, Info } from 'lucide-react';
+import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
-import { checkPlagiarism } from '@/services/freeAIService';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface Source {
   url: string;
   title: string;
   similarity: number;
   matchedText: string;
-  sourceType: string;
-  publicationDate?: string;
-  author?: string;
-  highlightRanges?: Array<[number, number]>;
-}
-
-interface ParagraphAnalysis {
-  paragraph: string;
-  originalityScore: number;
-  matchingSources: number[];
 }
 
 interface PlagiarismResult {
@@ -31,15 +17,12 @@ interface PlagiarismResult {
   plagiarismScore: number;
   sources: Source[];
   summary: string;
-  paragraphAnalysis?: ParagraphAnalysis[];
-  citationSuggestions?: string[];
 }
 
 const PlagiarismChecker = () => {
   const [inputText, setInputText] = useState('');
   const [result, setResult] = useState<PlagiarismResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [copiedCitation, setCopiedCitation] = useState<number | null>(null);
 
   const handleCheck = async () => {
     if (!inputText.trim()) {
@@ -49,15 +32,66 @@ const PlagiarismChecker = () => {
 
     setIsLoading(true);
     try {
-      const plagiarismResult = await checkPlagiarism(inputText);
-      setResult(plagiarismResult);
-      toast.success('Plagiarism check complete');
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "system",
+              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
+
+              Since you don't have direct web search capabilities, simulate a plagiarism check by:
+              1. Identifying common phrases, quotes, or passages that might appear in other sources
+              2. Evaluating the originality of ideas and expressions
+              3. Looking for distinctive academic or professional writing patterns
+              
+              After analysis, provide a JSON response with these fields:
+              - originalityScore: a number between 0 and 100 representing how original the text appears
+              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
+              - sources: an array of simulated matching sources, each with:
+                * url: a plausible website URL where similar content might be found
+                * title: a plausible title for the source
+                * similarity: a percentage (0-100) indicating how similar this source is
+                * matchedText: a brief excerpt showing what text might match
+              - summary: a brief explanation of your reasoning (max 150 words)
+              
+              Include 1-3 simulated sources for demonstration purposes.
+              
+              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
+            },
+            {
+              role: "user",
+              content: inputText
+            }
+          ],
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check plagiarism');
+      }
+
+      const data = await response.json();
+      const responseContent = data.choices[0].message.content;
+      
+      // Parse the JSON response
+      try {
+        const parsedResult = JSON.parse(responseContent);
+        setResult(parsedResult);
+        toast.success('Plagiarism check complete');
+      } catch (error) {
+        console.error('Failed to parse AI response:', responseContent);
+        toast.error('Failed to parse plagiarism check result');
+      }
     } catch (error) {
       console.error('Error checking plagiarism:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-      }
-      
       toast.error('Failed to check plagiarism. Please try again.');
     } finally {
       setIsLoading(false);
@@ -82,34 +116,15 @@ const PlagiarismChecker = () => {
     return 'Possible Plagiarism';
   };
 
-  const handleCopyCitation = (index: number) => {
-    if (result?.citationSuggestions?.[index]) {
-      navigator.clipboard.writeText(result.citationSuggestions[index]);
-      setCopiedCitation(index);
-      toast.success('Citation copied to clipboard');
-      
-      // Reset the copied state after 2 seconds
-      setTimeout(() => {
-        setCopiedCitation(null);
-      }, 2000);
-    }
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown date';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  };
-
   return (
     <div className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
       <div className="bg-primary/5 border-b p-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-primary">Advanced Plagiarism Checker</h3>
+          <h3 className="font-semibold text-primary">Plagiarism Checker</h3>
           <div className="flex items-center space-x-2">
             <div className="h-2 w-2 rounded-full bg-green-500"></div>
-            <span className="text-sm text-muted-foreground">Free Plagiarism Tool</span>
+            <span className="text-sm text-muted-foreground">Powered by WriteGenuine</span>
           </div>
         </div>
       </div>
@@ -126,7 +141,7 @@ const PlagiarismChecker = () => {
             className="min-h-[150px]"
           />
           <p className="text-xs text-muted-foreground mt-2">
-            For best results, enter at least 300 characters. Paragraphs separated by blank lines will be analyzed individually.
+            For best results, enter at least 300 characters.
           </p>
         </div>
 
@@ -153,171 +168,55 @@ const PlagiarismChecker = () => {
 
         {/* Results Section */}
         {result && (
-          <div className="mt-6 space-y-8">
-            {/* Summary Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="flex justify-between items-center">
-                  <span>Analysis Summary</span>
-                  <div className={`text-lg font-bold ${getScoreColor(result.originalityScore)}`}>
-                    {result.originalityScore}% Original
-                  </div>
-                </CardTitle>
-                <CardDescription>Overall assessment of your text</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4">
-                  <Progress value={result.originalityScore} className={`h-2 ${getProgressColor(result.originalityScore)}`} />
-                  <div className="flex justify-between mt-1 text-sm text-muted-foreground">
-                    <span>Low Originality</span>
-                    <span>{getSeverityLabel(result.originalityScore)}</span>
-                    <span>High Originality</span>
-                  </div>
+          <div className="mt-6 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium">Originality Score</label>
+                <div className={`text-lg font-bold ${getScoreColor(result.originalityScore)}`}>
+                  {result.originalityScore}%
                 </div>
-                <div className="bg-muted/30 rounded-lg p-4 text-sm">
-                  {result.summary}
-                </div>
-              </CardContent>
-            </Card>
-           
-            {/* Tabbed Results */}
-            <Tabs defaultValue="sources" className="w-full">
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="sources">Matching Sources</TabsTrigger>
-                <TabsTrigger value="paragraphs">Paragraph Analysis</TabsTrigger>
-                <TabsTrigger value="citations">Citation Suggestions</TabsTrigger>
-              </TabsList>
-              
-              {/* Sources Tab */}
-              <TabsContent value="sources" className="space-y-4">
-                <h3 className="text-lg font-medium mb-2">Potential Sources ({result.sources.length})</h3>
-                {result.sources.length === 0 ? (
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/20 rounded-md">
-                    No matching sources were found. Your content appears to be original.
-                  </div>
-                ) : (
-                  result.sources.map((source, index) => (
-                    <div key={index} className="border rounded-lg overflow-hidden">
-                      <div className="bg-muted/20 p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <h4 className="font-medium">{source.title.split('|')[0].trim()}</h4>
-                            <div className="flex items-center text-xs text-muted-foreground space-x-2">
-                              <Badge variant="outline">{source.sourceType}</Badge>
-                              {source.publicationDate && <span>• Published: {formatDate(source.publicationDate)}</span>}
-                              {source.author && <span>• Author: {source.author}</span>}
-                            </div>
-                          </div>
-                          <div className={`text-sm font-medium px-2 py-1 rounded ${
-                            source.similarity > 70 ? 'bg-red-100 text-red-700' : 
-                            source.similarity > 40 ? 'bg-yellow-100 text-yellow-700' : 
-                            'bg-green-100 text-green-700'
-                          }`}>
-                            {source.similarity}% match
-                          </div>
-                        </div>
-                        <div className="mt-2 text-xs text-blue-600 truncate">
-                          <a href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center hover:underline">
-                            {source.url} <ExternalLink className="h-3 w-3 ml-1" />
-                          </a>
-                        </div>
-                      </div>
-                      <div className="p-4 border-t">
-                        <h5 className="text-xs font-medium mb-2 text-muted-foreground">Matched Content:</h5>
-                        <blockquote className="bg-yellow-50 p-3 text-sm rounded border border-yellow-200 italic">
-                          "{source.matchedText}"
-                        </blockquote>
-                      </div>
+              </div>
+              <Progress value={result.originalityScore} className={`h-2 ${getProgressColor(result.originalityScore)}`} />
+              <div className="flex justify-between mt-1 text-sm text-muted-foreground">
+                <span>Low Originality</span>
+                <span>{getSeverityLabel(result.originalityScore)}</span>
+                <span>High Originality</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Analysis</label>
+              <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                {result.summary}
+              </div>
+            </div>
+
+            {result.sources && result.sources.length > 0 && (
+              <div className="space-y-4">
+                <label className="block text-sm font-medium">Potential Sources</label>
+                {result.sources.map((source, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">{source.title}</h4>
+                      <span className={`text-sm font-medium ${source.similarity > 50 ? 'text-red-500' : 'text-yellow-500'}`}>
+                        {source.similarity}% match
+                      </span>
                     </div>
-                  ))
-                )}
-              </TabsContent>
-              
-              {/* Paragraph Analysis Tab */}
-              <TabsContent value="paragraphs" className="space-y-4">
-                <h3 className="text-lg font-medium mb-2">Paragraph-Level Analysis</h3>
-                {!result.paragraphAnalysis || result.paragraphAnalysis.length === 0 ? (
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/20 rounded-md">
-                    No paragraph analysis available. Try adding more content with clear paragraph breaks.
-                  </div>
-                ) : (
-                  result.paragraphAnalysis.map((para, index) => (
-                    <div key={index} className="border rounded-lg overflow-hidden">
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm">Paragraph {index + 1}</h4>
-                          <div className={`text-sm font-medium ${getScoreColor(para.originalityScore)}`}>
-                            {para.originalityScore}% Original
-                          </div>
-                        </div>
-                        <p className="text-sm">{para.paragraph}</p>
-                      </div>
-                      {para.matchingSources.length > 0 && (
-                        <div className="p-3 border-t bg-muted/10">
-                          <h5 className="text-xs font-medium mb-2">Matching Sources:</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {para.matchingSources.map(sourceIndex => (
-                              <Badge key={sourceIndex} variant="secondary" className="text-xs">
-                                {result.sources[sourceIndex]?.title.split('|')[0].trim().substring(0, 20)}... ({result.sources[sourceIndex]?.similarity}% match)
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                    <div className="bg-yellow-50 p-2 text-xs rounded border border-yellow-200 mt-2">
+                      "{source.matchedText}"
                     </div>
-                  ))
-                )}
-              </TabsContent>
-              
-              {/* Citations Tab */}
-              <TabsContent value="citations" className="space-y-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-medium">Citation Suggestions</h3>
-                </div>
-                
-                <div className="bg-blue-50 p-4 rounded-md mb-4 flex items-start space-x-3">
-                  <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-                  <div className="text-sm text-blue-700">
-                    These citations are provided in APA format to help you properly attribute sources if needed. 
-                    Always verify source information before academic submission.
                   </div>
-                </div>
-                
-                {!result.citationSuggestions || result.citationSuggestions.length === 0 ? (
-                  <div className="text-sm text-muted-foreground p-4 bg-muted/20 rounded-md">
-                    No citation suggestions available. This content appears to be highly original.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {result.citationSuggestions.map((citation, index) => (
-                      <div key={index} className="flex items-start justify-between border rounded-lg p-4 bg-card">
-                        <div className="text-sm pr-4">{citation}</div>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="shrink-0"
-                          onClick={() => handleCopyCitation(index)}
-                        >
-                          {copiedCitation === index ? (
-                            <><Check className="h-4 w-4 mr-1" /> Copied</>
-                          ) : (
-                            <><Copy className="h-4 w-4 mr-1" /> Copy</>
-                          )}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                ))}
+              </div>
+            )}
 
             <div className="flex items-start space-x-3 text-sm bg-blue-50 p-4 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+              <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
               <div>
                 <p className="font-medium text-blue-700">Disclaimer</p>
                 <p className="text-blue-600 mt-1">
-                  This is a simulated plagiarism check. Results are for demonstration purposes only and should not be considered definitive. For academic or professional use, we recommend verifying with multiple tools and comprehensive checks.
+                  This is a simulated plagiarism check. For academic or professional use, we recommend verifying with multiple tools and comprehensive checks.
                 </p>
               </div>
             </div>
