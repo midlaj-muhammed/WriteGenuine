@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, RefreshCw, CheckCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 import {
   Select,
   SelectContent,
@@ -10,12 +11,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { geminiService } from '@/lib/gemini-service';
 
 const HumanizedTextPreview = () => {
   const [inputText, setInputText] = useState('');
   const [humanizedText, setHumanizedText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [style, setStyle] = useState('natural');
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setApiKey(savedKey);
+      // Update the API key in the service
+      if (typeof window !== 'undefined') {
+        (window as any).geminiApiKey = savedKey;
+      }
+    }
+  }, []);
+
+  const handleApiKeySubmit = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+    setApiKey(key);
+    // Update the API key in the service
+    if (typeof window !== 'undefined') {
+      (window as any).geminiApiKey = key;
+    }
+    toast({
+      title: "API Key Saved",
+      description: "Your API key has been saved to your browser's local storage.",
+    });
+  };
 
   const getSystemPrompt = (style: string) => {
     const prompts = {
@@ -59,46 +89,39 @@ const HumanizedTextPreview = () => {
   };
 
   const handleHumanize = async () => {
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Google Generative AI API key to use this feature.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!inputText.trim()) {
-      toast.error('Please enter some text to humanize');
+      toast({
+        title: "Text Required",
+        description: "Please enter some text to humanize",
+        variant: "destructive"
+      });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: getSystemPrompt(style)
-            },
-            {
-              role: "user",
-              content: inputText
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-        }),
+      const humanized = await geminiService.humanizeAI(inputText);
+      setHumanizedText(humanized);
+      toast({
+        title: "Success",
+        description: "Text humanized successfully!",
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to humanize text');
-      }
-
-      const data = await response.json();
-      setHumanizedText(data.choices[0].message.content);
-      toast.success('Text humanized successfully!');
     } catch (error) {
       console.error('Error humanizing text:', error);
-      toast.error('Failed to humanize text. Please try again.');
+      toast({
+        title: "Failed to humanize text", 
+        description: "Please try again with different content.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +142,49 @@ const HumanizedTextPreview = () => {
 
       {/* Content */}
       <div className="p-6 space-y-6">
+        {!apiKey && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">API Key Required</CardTitle>
+              <CardDescription>
+                Please enter your Google Generative AI API key to use this feature
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Input 
+                  type="password" 
+                  placeholder="Enter API key..." 
+                  value={apiKey || ''}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={() => handleApiKeySubmit(apiKey || '')} disabled={!apiKey?.trim()}>
+                  Save Key
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Your API key will only be stored in your browser's local storage.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Style Selector */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Writing Style</label>
+          <Select value={style} onValueChange={setStyle}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select style" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="natural">Natural & Balanced</SelectItem>
+              <SelectItem value="casual">Casual & Conversational</SelectItem>
+              <SelectItem value="professional">Professional & Formal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Input Section */}
         <div>
           <label className="block text-sm font-medium mb-2">Original Text</label>
@@ -134,7 +200,7 @@ const HumanizedTextPreview = () => {
         <div className="flex justify-end">
           <Button
             onClick={handleHumanize}
-            disabled={isLoading || !inputText.trim()}
+            disabled={isLoading || !inputText.trim() || !apiKey}
             className="gap-2"
           >
             {isLoading ? (
@@ -171,4 +237,4 @@ const HumanizedTextPreview = () => {
   );
 };
 
-export default HumanizedTextPreview; 
+export default HumanizedTextPreview;

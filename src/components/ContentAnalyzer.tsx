@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -6,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2, Check, Copy, Info } from 'lucide-react';
-import { geminiService, ContentAnalysisResult } from '@/lib/mock-service';
-import { type AIDetectionResult } from '@/lib/mock-service';
-import { toast } from 'sonner';
+import { geminiService, ContentAnalysisResult } from '@/lib/gemini-service';
+import { type AIDetectionResult } from '@/lib/gemini-service';
+import { toast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
 
 interface AnalysisState {
   loading: boolean;
@@ -22,10 +24,50 @@ const ContentAnalyzer = () => {
   const [analysis, setAnalysis] = useState<AnalysisState>({
     loading: false,
   });
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setApiKey(savedKey);
+      // Update the API key in the service
+      if (typeof window !== 'undefined') {
+        (window as any).geminiApiKey = savedKey;
+      }
+    }
+  }, []);
+
+  const handleApiKeySubmit = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+    setApiKey(key);
+    // Update the API key in the service
+    if (typeof window !== 'undefined') {
+      (window as any).geminiApiKey = key;
+    }
+    toast({
+      title: "API Key Saved",
+      description: "Your API key has been saved to your browser's local storage.",
+    });
+  };
 
   const handleAnalyze = async () => {
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Google Generative AI API key to use this feature.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!text.trim()) {
-      toast.error('Please enter some text to analyze');
+      toast({
+        title: "Text Required",
+        description: "Please enter some text to analyze",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -45,13 +87,64 @@ const ContentAnalyzer = () => {
           break;
       }
       setAnalysis({ loading: false, result });
+      toast({
+        title: "Analysis Complete",
+        description: `Your ${activeTab} analysis has completed successfully.`,
+      });
     } catch (error) {
+      console.error("Error analyzing text:", error);
       setAnalysis({
         loading: false,
         error: 'Failed to analyze text. Please try again.',
       });
-      toast.error('Analysis failed. Please try again.');
+      toast({
+        title: "Analysis Failed",
+        description: "Please check your API key and try again.",
+        variant: "destructive"
+      });
     }
+  };
+
+  const handleCopy = () => {
+    if (typeof analysis.result === 'string') {
+      navigator.clipboard.writeText(analysis.result);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: "Copied",
+        description: "Text copied to clipboard.",
+      });
+    }
+  };
+
+  const renderApiKeyInput = () => {
+    return (
+      <Card className="p-4 mb-6">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold">API Key Required</h3>
+            <p className="text-sm text-muted-foreground">
+              Enter your Google Generative AI API key to use this feature
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <Input
+              type="password"
+              placeholder="Enter API key..."
+              value={apiKey || ''}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={() => handleApiKeySubmit(apiKey || '')} disabled={!apiKey?.trim()}>
+              Save Key
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Your API key will only be stored in your browser's local storage.
+          </p>
+        </div>
+      </Card>
+    );
   };
 
   const renderResult = () => {
@@ -80,14 +173,6 @@ const ContentAnalyzer = () => {
 
     if (typeof analysis.result === 'string') {
       // Humanized text result
-      const [copied, setCopied] = useState(false);
-      
-      const handleCopy = () => {
-        navigator.clipboard.writeText(analysis.result as string);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      };
-      
       return (
         <Card className="p-4">
           <div className="flex justify-between items-center mb-4">
@@ -163,6 +248,8 @@ const ContentAnalyzer = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      {!apiKey && renderApiKeyInput()}
+      
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="plagiarism">Plagiarism Check</TabsTrigger>
@@ -180,7 +267,7 @@ const ContentAnalyzer = () => {
 
           <Button
             onClick={handleAnalyze}
-            disabled={analysis.loading}
+            disabled={analysis.loading || !apiKey}
             className="w-full"
           >
             {analysis.loading ? (
@@ -200,4 +287,4 @@ const ContentAnalyzer = () => {
   );
 };
 
-export default ContentAnalyzer; 
+export default ContentAnalyzer;

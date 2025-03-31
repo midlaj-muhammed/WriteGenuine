@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,40 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShieldCheck, Bot, RefreshCw, Copy, Check, FileText, BarChart, AlertTriangle, Info, ChevronRight, Loader2 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
+import { toast } from '@/components/ui/use-toast';
+import { geminiService, ContentAnalysisResult, AIDetectionResult } from '@/lib/gemini-service';
+
+const ApiKeyInput = ({ onSubmit }: { onSubmit: (key: string) => void }) => {
+  const [apiKey, setApiKey] = useState('');
+
+  return (
+    <Card className="w-full mb-6">
+      <CardHeader>
+        <CardTitle className="text-lg">API Key Required</CardTitle>
+        <CardDescription>
+          Please enter your Google Generative AI API key to use this feature
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-4">
+          <Input 
+            type="password" 
+            placeholder="Enter API key..." 
+            value={apiKey} 
+            onChange={(e) => setApiKey(e.target.value)}
+            className="flex-1"
+          />
+          <Button onClick={() => onSubmit(apiKey)} disabled={!apiKey.trim()}>
+            Save Key
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Your API key will only be stored in your browser's local storage.
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
 
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState<{[key: string]: boolean}>({
@@ -24,48 +58,86 @@ const Dashboard = () => {
     detection: null,
     humanize: null
   });
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setApiKey(savedKey);
+      if (typeof window !== 'undefined') {
+        (window as any).geminiApiKey = savedKey;
+      }
+    }
+  }, []);
+
+  const handleApiKeySubmit = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+    setApiKey(key);
+    if (typeof window !== 'undefined') {
+      (window as any).geminiApiKey = key;
+    }
+    toast({
+      title: "API Key Saved",
+      description: "Your API key has been saved to your browser's local storage.",
+    });
+  };
 
   const handleTextChange = (tab: string, value: string) => {
     setText((prev) => ({ ...prev, [tab]: value }));
   };
 
-  const handleSubmit = (tab: string) => {
-    // Simulate API call
+  const handleSubmit = async (tab: string) => {
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Google Generative AI API key to use this feature.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!text[tab].trim()) {
+      toast({
+        title: "Text Required",
+        description: "Please enter some text to analyze.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading((prev) => ({ ...prev, [tab]: true }));
     
-    setTimeout(() => {
+    try {
       let result = null;
       
-      // Mock results based on the tab
       if (tab === 'plagiarism') {
-        result = {
-          originalityScore: 78,
-          matches: [
-            { source: 'https://example.com/article1', similarity: 15, text: 'Lorem ipsum dolor sit amet' },
-            { source: 'https://example.org/content2', similarity: 7, text: 'consectetur adipiscing elit' }
-          ]
-        };
+        result = await geminiService.checkPlagiarism(text[tab]);
       } else if (tab === 'detection') {
-        result = {
-          aiProbability: 73,
-          humanProbability: 27,
-          patterns: {
-            repetitive: 'High',
-            complexity: 'Low',
-            variability: 'Medium'
-          }
-        };
+        result = await geminiService.detectAI(text[tab]);
       } else if (tab === 'humanize') {
+        result = await geminiService.humanizeAI(text[tab]);
         result = {
           originalText: text.humanize,
-          humanizedText: "This is a humanized version of the original text. It maintains the same meaning but uses more natural language patterns, varied sentence structures, and avoids repetitive phrases that are typical of AI-generated content.",
+          humanizedText: result,
           humanScore: 92
         };
       }
       
       setResults((prev) => ({ ...prev, [tab]: result }));
+      toast({
+        title: "Analysis Complete",
+        description: `Your ${tab} analysis has completed successfully.`,
+      });
+    } catch (error) {
+      console.error(`Error in ${tab}:`, error);
+      toast({
+        title: "Analysis Failed",
+        description: `Failed to complete ${tab} analysis. Please try again.`,
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading((prev) => ({ ...prev, [tab]: false }));
-    }, 2000);
+    }
   };
 
   return (
@@ -79,6 +151,8 @@ const Dashboard = () => {
             Use our tools to check, detect, and humanize your content.
           </p>
         </div>
+        
+        {!apiKey && <ApiKeyInput onSubmit={handleApiKeySubmit} />}
         
         <Tabs defaultValue="plagiarism" className="w-full">
           <TabsList className="grid grid-cols-3 w-full max-w-lg mb-8">

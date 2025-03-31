@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { geminiService } from '@/lib/gemini-service';
 
 interface Source {
   url: string;
@@ -23,76 +27,81 @@ const PlagiarismChecker = () => {
   const [inputText, setInputText] = useState('');
   const [result, setResult] = useState<PlagiarismResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  // Load API key from localStorage on component mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+      setApiKey(savedKey);
+      // Update the API key in the service
+      if (typeof window !== 'undefined') {
+        (window as any).geminiApiKey = savedKey;
+      }
+    }
+  }, []);
+
+  const handleApiKeySubmit = (key: string) => {
+    localStorage.setItem('gemini_api_key', key);
+    setApiKey(key);
+    // Update the API key in the service
+    if (typeof window !== 'undefined') {
+      (window as any).geminiApiKey = key;
+    }
+    toast({
+      title: "API Key Saved",
+      description: "Your API key has been saved to your browser's local storage.",
+    });
+  };
 
   const handleCheck = async () => {
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Google Generative AI API key to use this feature.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!inputText.trim()) {
-      toast.error('Please enter some text to check for plagiarism');
+      toast({
+        title: "Text Required",
+        description: "Please enter some text to check for plagiarism",
+        variant: "destructive"
+      });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: `You are a plagiarism detection expert. Your task is to analyze the given text and determine whether it contains plagiarized content.
-
-              Since you don't have direct web search capabilities, simulate a plagiarism check by:
-              1. Identifying common phrases, quotes, or passages that might appear in other sources
-              2. Evaluating the originality of ideas and expressions
-              3. Looking for distinctive academic or professional writing patterns
-              
-              After analysis, provide a JSON response with these fields:
-              - originalityScore: a number between 0 and 100 representing how original the text appears
-              - plagiarismScore: a number between 0 and 100 (should be 100 - originalityScore)
-              - sources: an array of simulated matching sources, each with:
-                * url: a plausible website URL where similar content might be found
-                * title: a plausible title for the source
-                * similarity: a percentage (0-100) indicating how similar this source is
-                * matchedText: a brief excerpt showing what text might match
-              - summary: a brief explanation of your reasoning (max 150 words)
-              
-              Include 1-3 simulated sources for demonstration purposes.
-              
-              IMPORTANT: Return ONLY valid JSON with no additional text, explanations, or formatting.`
-            },
-            {
-              role: "user",
-              content: inputText
-            }
-          ],
-          temperature: 0.2,
-          max_tokens: 1000,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to check plagiarism');
-      }
-
-      const data = await response.json();
-      const responseContent = data.choices[0].message.content;
+      const analysisResult = await geminiService.checkPlagiarism(inputText);
       
-      // Parse the JSON response
-      try {
-        const parsedResult = JSON.parse(responseContent);
-        setResult(parsedResult);
-        toast.success('Plagiarism check complete');
-      } catch (error) {
-        console.error('Failed to parse AI response:', responseContent);
-        toast.error('Failed to parse plagiarism check result');
-      }
+      // Convert the result to the expected format
+      const plagiarismResult: PlagiarismResult = {
+        originalityScore: analysisResult.score,
+        plagiarismScore: 100 - analysisResult.score,
+        sources: analysisResult.sources?.map(source => ({
+          url: source.url,
+          title: source.title || 'Unknown Source',
+          similarity: source.similarity,
+          matchedText: source.text
+        })) || [],
+        summary: analysisResult.details
+      };
+      
+      setResult(plagiarismResult);
+      toast({
+        title: "Plagiarism Check Complete",
+        description: "Your content has been analyzed for plagiarism.",
+      });
     } catch (error) {
       console.error('Error checking plagiarism:', error);
-      toast.error('Failed to check plagiarism. Please try again.');
+      toast({
+        title: "Failed to check plagiarism",
+        description: "Please check your API key and try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +140,34 @@ const PlagiarismChecker = () => {
 
       {/* Content */}
       <div className="p-6 space-y-6">
+        {!apiKey && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">API Key Required</CardTitle>
+              <CardDescription>
+                Please enter your Google Generative AI API key to use this feature
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Input 
+                  type="password" 
+                  placeholder="Enter API key..." 
+                  value={apiKey || ''}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={() => handleApiKeySubmit(apiKey || '')} disabled={!apiKey?.trim()}>
+                  Save Key
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Your API key will only be stored in your browser's local storage.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Input Section */}
         <div>
           <label className="block text-sm font-medium mb-2">Text to Check</label>
@@ -149,7 +186,7 @@ const PlagiarismChecker = () => {
         <div className="flex justify-end">
           <Button
             onClick={handleCheck}
-            disabled={isLoading || !inputText.trim()}
+            disabled={isLoading || !inputText.trim() || !apiKey}
             className="gap-2"
           >
             {isLoading ? (
@@ -227,4 +264,4 @@ const PlagiarismChecker = () => {
   );
 };
 
-export default PlagiarismChecker; 
+export default PlagiarismChecker;
