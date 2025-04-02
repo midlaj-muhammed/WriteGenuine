@@ -1,3 +1,4 @@
+
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 // Define the same interfaces as in mock-service.ts for compatibility
@@ -68,10 +69,10 @@ class GeminiService {
 
   // Configure safety settings for content generation
   private generationConfig = {
-    temperature: 0.7,
+    temperature: 0.4, // Reduced temperature for more precise outputs
     topK: 40,
     topP: 0.95,
-    maxOutputTokens: 1024,
+    maxOutputTokens: 2048, // Increased token limit for more detailed responses
   };
 
   private safetySettings = [
@@ -96,14 +97,20 @@ class GeminiService {
   // Helper method to extract JSON from the response
   private extractJsonFromResponse(text: string): any {
     try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Invalid response format");
+      // First try to parse the entire response as JSON
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        // Fall back to regex extraction if direct parsing fails
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error("Invalid response format");
+        }
+        return JSON.parse(jsonMatch[0]);
       }
-      return JSON.parse(jsonMatch[0]);
     } catch (error) {
       console.error("Error parsing JSON response:", error);
-      throw new Error("Failed to parse AI response");
+      throw new Error("Failed to parse AI response. Please try again with different text.");
     }
   }
 
@@ -111,27 +118,39 @@ class GeminiService {
     try {
       const model = this.getModel();
       const prompt = `
-      TASK: Analyze this text for potential plagiarism.
+      TASK: Conduct a comprehensive plagiarism analysis on the provided text.
       
-      TEXT: "${text}"
+      TEXT TO ANALYZE: "${text}"
       
-      Perform a detailed plagiarism check and return your analysis in the following JSON format:
+      INSTRUCTIONS:
+      1. Thoroughly analyze the text for originality and identify any potential plagiarized content
+      2. Consider common academic sources, web content, and published literature
+      3. Evaluate linguistic patterns, phrasal uniqueness, and structural originality
+      4. Generate a precise plagiarism score on a scale of 0-100 (where 100 is completely original)
+      5. Include a minimum of 3 potential sources with accurate similarity percentages if plagiarism is detected
+      6. Provide specific actionable recommendations tailored to the content
+      
+      FORMAT YOUR RESPONSE AS A VALID JSON OBJECT WITH THE FOLLOWING STRUCTURE:
       {
         "score": [number between 0-100 representing originality percentage],
-        "details": [detailed analysis of the text's originality],
-        "suggestions": [array of 3-5 specific suggestions to improve originality],
+        "details": [comprehensive analysis explaining the originality assessment with specific evidence],
+        "suggestions": [array of 4-6 specific, actionable suggestions to improve originality],
         "sources": [
           {
-            "text": [excerpt of potentially plagiarized text, with context],
-            "url": [simulated source URL],
-            "similarity": [percentage similarity],
-            "title": [simulated source title]
+            "text": [precise excerpt of potentially plagiarized text],
+            "url": [realistic source URL],
+            "similarity": [exact percentage similarity],
+            "title": [authentic source title]
           }
         ]
       }
       
-      Make sure to provide at least 2-3 potential sources with varying similarity scores.
-      Only provide the JSON response with no additional text or explanations.
+      IMPORTANT:
+      - Ensure your response contains ONLY the JSON object with no additional text
+      - Use realistic, credible sources and accurate similarity percentages
+      - Provide detailed analysis that would help academic or professional users
+      - Base the score on objective textual analysis, not subjective impression
+      - Maintain consistency between the score and the detailed analysis
       `;
 
       const result = await model.generateContent({
@@ -144,27 +163,30 @@ class GeminiService {
       const textResponse = response.text();
       
       // Extract JSON from the response
-      return this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
+      const parsedResponse = this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
+      
+      // Validate and normalize the response
+      if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
+        parsedResponse.score = 85; // Default fallback
+      }
+      
+      if (!parsedResponse.details || parsedResponse.details.trim() === '') {
+        parsedResponse.details = "The text has been analyzed for potential plagiarism. Please review the results.";
+      }
+      
+      if (!parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions) || parsedResponse.suggestions.length === 0) {
+        parsedResponse.suggestions = [
+          "Ensure all direct quotes are properly cited",
+          "Paraphrase content in your own words",
+          "Cite all sources accurately in your reference list",
+          "Use plagiarism detection tools before final submission"
+        ];
+      }
+      
+      return parsedResponse;
     } catch (error) {
       console.error("Error checking plagiarism:", error);
-      // Return a fallback result with more detailed information
-      return {
-        score: 85,
-        details: "Unable to perform full analysis. The text appears to be mostly original based on initial review, but we recommend trying again with a more specific text sample for a complete analysis.",
-        suggestions: [
-          "Try running the check again with a more specific text sample.",
-          "Consider checking sections of your text separately for more accurate results.",
-          "Use quotation marks for direct quotes and cite sources appropriately."
-        ],
-        sources: [
-          {
-            text: "Similar content may exist online. Please try again with a more specific sample.",
-            url: "https://example.com/similar-content",
-            similarity: 25,
-            title: "Potential Similar Source"
-          }
-        ]
-      };
+      throw new Error("Failed to analyze text for plagiarism. Please try again with a different text sample or check your API key.");
     }
   }
 
@@ -172,18 +194,25 @@ class GeminiService {
     try {
       const model = this.getModel();
       const prompt = `
-      TASK: Analyze this text to determine if it was written by AI or a human.
+      TASK: Perform a comprehensive analysis to determine whether the provided text was written by an AI or a human.
       
-      TEXT: "${text}"
+      TEXT TO ANALYZE: "${text}"
       
-      Perform a detailed AI detection analysis and return your results in the following JSON format:
+      INSTRUCTIONS:
+      1. Conduct a thorough linguistic analysis examining patterns, consistency, creativity, and irregularities
+      2. Identify specific AI writing markers including repetitive structures, unnatural transitions, and formulaic expressions
+      3. Evaluate human writing indicators such as personal anecdotes, unique perspectives, and stylistic inconsistencies
+      4. Provide detailed text statistics and pattern analysis to support your conclusion
+      5. Calculate precise probability scores with statistical justification
+      
+      FORMAT YOUR RESPONSE AS A VALID JSON OBJECT WITH THE FOLLOWING STRUCTURE:
       {
         "score": [number between 0-100 representing AI probability],
         "aiProbability": [number between 0-100 representing AI probability],
         "humanProbability": [number between 0-100 representing human probability],
-        "details": [detailed analysis of why you believe the text is AI or human-generated],
-        "suggestions": [array of 3-5 specific suggestions to make AI text more human-like],
-        "confidenceLevel": [either "low", "medium", or "high"],
+        "details": [comprehensive analysis with specific examples from the text],
+        "suggestions": [array of 4-6 specific improvements to make AI text more human-like],
+        "confidenceLevel": [either "low", "medium", or "high" based on analysis certainty],
         "patterns": {
           "repetitive": [either "Low", "Medium", or "High"],
           "complexity": [either "Low", "Medium", or "High"],
@@ -191,29 +220,33 @@ class GeminiService {
         },
         "patternAnalysis": [
           {
-            "name": [name of pattern],
-            "score": [score between 0-100],
-            "description": [description of the pattern],
+            "name": [specific pattern name],
+            "score": [pattern intensity score between 0-100],
+            "description": [detailed explanation of the pattern with examples],
             "severity": [either "low", "medium", or "high"]
           }
         ],
         "textStatistics": {
-          "averageSentenceLength": [number],
+          "averageSentenceLength": [precise number],
           "vocabularyDiversity": [number between 0-100],
-          "repetitivePhrasesCount": [number],
+          "repetitivePhrasesCount": [exact number],
           "uncommonWordsPercentage": [number between 0-100]
         },
         "highlightedText": [
           {
-            "text": [excerpt from the analyzed text],
-            "reason": [explanation of why this text indicates AI writing],
+            "text": [exact excerpt from the analyzed text],
+            "reason": [specific explanation of why this indicates AI writing],
             "type": [one of: "repetition", "pattern", "structure", "vocabulary"]
           }
         ]
       }
       
-      Provide at least 3 pattern analysis items and 2-3 highlighted text examples.
-      Only provide the JSON response with no additional text or explanations.
+      IMPORTANT:
+      - Ensure your response contains ONLY the JSON object with no additional text
+      - Include at least 4 pattern analysis items and 3-5 highlighted text examples
+      - Base conclusions on objective textual analysis, not subjective impression
+      - Provide detailed, actionable feedback useful to professional writers
+      - Calculate all statistics with mathematical precision
       `;
 
       const result = await model.generateContent({
@@ -226,62 +259,39 @@ class GeminiService {
       const textResponse = response.text();
       
       // Extract JSON from the response
-      const parsedResult = this.extractJsonFromResponse(textResponse) as AIDetectionResult;
+      const parsedResponse = this.extractJsonFromResponse(textResponse) as AIDetectionResult;
       
-      // Ensure the object has all required properties for the UI
-      return {
-        ...parsedResult,
-        score: parsedResult.score || parsedResult.aiProbability || 50,
-        aiProbability: parsedResult.aiProbability || parsedResult.score || 50,
-        humanProbability: parsedResult.humanProbability || (100 - (parsedResult.score || 50)),
-        confidenceLevel: parsedResult.confidenceLevel || (parsedResult.score > 80 ? 'high' : parsedResult.score > 50 ? 'medium' : 'low'),
-        patterns: parsedResult.patterns || {
-          repetitive: "Medium",
-          complexity: "Medium",
-          variability: "Medium"
-        },
-        details: parsedResult.details || "Analysis completed."
-      };
+      // Validate and normalize the response
+      if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
+        parsedResponse.score = 50; // Default fallback
+      }
+      
+      if (!parsedResponse.aiProbability || typeof parsedResponse.aiProbability !== 'number') {
+        parsedResponse.aiProbability = parsedResponse.score;
+      }
+      
+      if (!parsedResponse.humanProbability || typeof parsedResponse.humanProbability !== 'number') {
+        parsedResponse.humanProbability = 100 - parsedResponse.score;
+      }
+      
+      if (!parsedResponse.confidenceLevel) {
+        if (parsedResponse.score > 80 || parsedResponse.score < 20) {
+          parsedResponse.confidenceLevel = 'high';
+        } else if (parsedResponse.score > 60 || parsedResponse.score < 40) {
+          parsedResponse.confidenceLevel = 'medium';
+        } else {
+          parsedResponse.confidenceLevel = 'low';
+        }
+      }
+      
+      if (!parsedResponse.details || parsedResponse.details.trim() === '') {
+        parsedResponse.details = "The text has been analyzed for AI detection patterns. Review the results for a detailed assessment.";
+      }
+      
+      return parsedResponse;
     } catch (error) {
       console.error("Error detecting AI:", error);
-      // Return a fallback result with more detailed information
-      return {
-        score: 50,
-        aiProbability: 50,
-        humanProbability: 50,
-        details: "Unable to perform full analysis. The text provided doesn't contain enough patterns to make a confident determination. Please try again with a longer text sample.",
-        suggestions: [
-          "Try analyzing a longer text sample for more accurate results.",
-          "Include more varied content with different topics and styles.",
-          "Provide text with more complex sentence structures for better analysis."
-        ],
-        patterns: {
-          repetitive: "Medium",
-          complexity: "Medium",
-          variability: "Medium"
-        },
-        confidenceLevel: "low",
-        patternAnalysis: [
-          {
-            name: "Sentence Structure",
-            score: 50,
-            description: "Analysis incomplete due to limited sample size",
-            severity: "low"
-          },
-          {
-            name: "Vocabulary Usage",
-            score: 45,
-            description: "Insufficient data to fully analyze vocabulary patterns",
-            severity: "low"
-          }
-        ],
-        textStatistics: {
-          averageSentenceLength: 15,
-          vocabularyDiversity: 60,
-          repetitivePhrasesCount: 1,
-          uncommonWordsPercentage: 10
-        }
-      };
+      throw new Error("Failed to analyze text for AI detection. Please try again with a different text sample or check your API key.");
     }
   }
 
@@ -289,37 +299,51 @@ class GeminiService {
     try {
       const model = this.getModel();
       const prompt = `
-      TASK: Rewrite this AI-generated text to sound more human.
+      TASK: Transform the provided AI-generated text into naturally-written human content.
       
-      TEXT: "${text}"
+      TEXT TO HUMANIZE: "${text}"
       
-      Follow these guidelines to humanize the text:
-      1. Vary sentence structure and length significantly
-      2. Add natural transitions and conversation flow between ideas
-      3. Include occasional colloquialisms, idioms, or conversational elements
-      4. Add subtle imperfections (like self-corrections, asides, or minor tangents)
-      5. Maintain the original meaning and key points
-      6. Make the tone more personal, authentic and less formal
-      7. Avoid repetitive patterns or formulaic expressions
-      8. Add personal perspective or experiences where appropriate
-      9. Include rhetorical questions or thought processes
-      10. Use contractions and informal language naturally
+      INSTRUCTIONS FOR HUMANIZATION:
+      1. Restructure the text with varied sentence lengths, natural transitions, and authentic flow
+      2. Add personal voice elements such as brief asides, rhetorical questions, and conversational phrases
+      3. Introduce subtle imperfections and stylistic variations that characterize human writing
+      4. Replace formulaic transitions with organic connections between ideas
+      5. Vary vocabulary choices while maintaining the original meaning and expertise level
+      6. Include natural hesitations, reconsiderations, or clarifying statements where appropriate
+      7. Adjust formality level to sound appropriately casual yet professional
+      8. Incorporate authentic analogies or examples that demonstrate personal experience
+      9. Ensure the text maintains coherence and readability throughout
+      10. Preserve all key points and technical accuracy from the original
       
-      Rewrite the text completely to sound more human while preserving the core message.
-      Only provide the rewritten text with no explanations or additional content.
+      IMPORTANT:
+      - Return ONLY the humanized text without any explanations or metadata
+      - Maintain the same overall length as the original text
+      - Preserve the technical accuracy and complexity of the original content
+      - Create text that would confidently pass advanced AI detection tools
+      - Ensure the tone matches realistic human expert communication
       `;
 
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: this.generationConfig,
+        generationConfig: {
+          ...this.generationConfig,
+          temperature: 0.7, // Higher temperature for more creative humanization
+        },
         safetySettings: this.safetySettings,
       });
 
       const response = result.response;
-      return response.text();
+      const humanizedText = response.text();
+      
+      // Verify the response has content
+      if (!humanizedText || humanizedText.trim().length === 0) {
+        throw new Error("Empty response received");
+      }
+      
+      return humanizedText;
     } catch (error) {
       console.error("Error humanizing text:", error);
-      return "Unable to humanize text at this time. Please try again later with a different text sample. For best results, provide content that is at least a few sentences long with clear context.";
+      throw new Error("Failed to humanize the text. Please try again with a different sample or check your API key.");
     }
   }
 }
