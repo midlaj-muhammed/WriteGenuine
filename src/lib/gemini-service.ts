@@ -17,7 +17,14 @@ export interface AIPatternAnalysis {
 }
 
 export interface AIDetectionResult extends ContentAnalysisResult {
+  aiProbability?: number;
+  humanProbability?: number;
   patternAnalysis?: AIPatternAnalysis[];
+  patterns?: {
+    repetitive: string;
+    complexity: string;
+    variability: string;
+  };
   humanScore?: number;
   confidenceLevel?: 'low' | 'medium' | 'high';
   textStatistics?: {
@@ -87,6 +94,20 @@ class GeminiService {
     },
   ];
 
+  // Helper method to extract JSON from the response
+  private extractJsonFromResponse(text: string): any {
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Invalid response format");
+      }
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error("Error parsing JSON response:", error);
+      throw new Error("Failed to parse AI response");
+    }
+  }
+
   async checkPlagiarism(text: string): Promise<ContentAnalysisResult> {
     try {
       const model = this.getModel();
@@ -123,12 +144,7 @@ class GeminiService {
       const textResponse = response.text();
       
       // Extract JSON from the response
-      const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse response");
-      }
-      
-      return JSON.parse(jsonMatch[0]) as ContentAnalysisResult;
+      return this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
     } catch (error) {
       console.error("Error checking plagiarism:", error);
       // Return a fallback result
@@ -152,31 +168,15 @@ class GeminiService {
       Perform a detailed AI detection analysis and return your results in the following JSON format:
       {
         "score": [number between 0-100 representing AI probability],
-        "humanScore": [number between 0-100 representing human probability],
-        "confidenceLevel": [either "low", "medium", or "high"],
+        "aiProbability": [number between 0-100 representing AI probability],
+        "humanProbability": [number between 0-100 representing human probability],
         "details": [detailed analysis of why you believe the text is AI or human-generated],
         "suggestions": [array of 3-5 suggestions to make AI text more human-like],
-        "patternAnalysis": [
-          {
-            "name": [pattern name],
-            "score": [pattern score],
-            "description": [pattern description],
-            "severity": [either "low", "medium", or "high"]
-          }
-        ],
-        "textStatistics": {
-          "averageSentenceLength": [average sentence length],
-          "vocabularyDiversity": [vocabulary diversity score],
-          "repetitivePhrasesCount": [count of repetitive phrases],
-          "uncommonWordsPercentage": [percentage of uncommon words]
-        },
-        "highlightedText": [
-          {
-            "text": [highlighted text excerpt],
-            "reason": [reason for highlighting],
-            "type": [either "repetition", "pattern", "structure", or "vocabulary"]
-          }
-        ]
+        "patterns": {
+          "repetitive": [either "Low", "Medium", or "High"],
+          "complexity": [either "Low", "Medium", or "High"],
+          "variability": [either "Low", "Medium", or "High"]
+        }
       }
       
       Only provide the JSON response with no additional text or explanations.
@@ -192,21 +192,35 @@ class GeminiService {
       const textResponse = response.text();
       
       // Extract JSON from the response
-      const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse response");
-      }
+      const parsedResult = this.extractJsonFromResponse(textResponse) as AIDetectionResult;
       
-      return JSON.parse(jsonMatch[0]) as AIDetectionResult;
+      // Ensure the object has all required properties for the UI
+      return {
+        ...parsedResult,
+        score: parsedResult.score || parsedResult.aiProbability || 50,
+        aiProbability: parsedResult.aiProbability || parsedResult.score || 50,
+        humanProbability: parsedResult.humanProbability || (100 - (parsedResult.score || 50)),
+        patterns: parsedResult.patterns || {
+          repetitive: "Medium",
+          complexity: "Medium",
+          variability: "Medium"
+        },
+        details: parsedResult.details || "Analysis completed."
+      };
     } catch (error) {
       console.error("Error detecting AI:", error);
       // Return a fallback result
       return {
         score: 50,
-        humanScore: 50,
-        confidenceLevel: "low",
-        details: "Unable to perform full analysis. The analysis could not be completed with high confidence.",
+        aiProbability: 50,
+        humanProbability: 50,
+        details: "Unable to perform full analysis. Please try again with a different text sample.",
         suggestions: ["Try analyzing a longer text sample for more accurate results."],
+        patterns: {
+          repetitive: "Medium",
+          complexity: "Medium",
+          variability: "Medium"
+        }
       };
     }
   }

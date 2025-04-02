@@ -6,7 +6,14 @@ const apiKeyManager = {
   // Retrieve the API key from localStorage
   getApiKey: (): string | null => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('gemini_api_key');
+      const key = localStorage.getItem('gemini_api_key');
+      
+      // Also set it on the window object for easy access by services
+      if (key) {
+        (window as any).geminiApiKey = key;
+      }
+      
+      return key;
     }
     return null;
   },

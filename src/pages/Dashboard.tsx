@@ -81,6 +81,8 @@ const Dashboard = () => {
       return;
     }
 
+    // Clear any previous results to avoid displaying stale data
+    setResults((prev) => ({ ...prev, [tab]: null }));
     setIsLoading((prev) => ({ ...prev, [tab]: true }));
     
     try {
@@ -97,6 +99,10 @@ const Dashboard = () => {
           humanizedText: humanizedText,
           humanScore: 92
         };
+      }
+      
+      if (!result) {
+        throw new Error("Failed to get valid result from API");
       }
       
       setResults((prev) => ({ ...prev, [tab]: result }));
