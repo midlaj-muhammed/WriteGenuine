@@ -1,4 +1,4 @@
-# ✅ Authenticity Haven
+# ✅ WriteGenuine
 
 A comprehensive text analysis platform for detecting AI-generated content, checking plagiarism, and humanizing AI text.
 
