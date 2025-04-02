@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { geminiService } from '@/lib/gemini-service';
+import apiKeyManager from '@/lib/api-key-manager';
 
 const HumanizedTextPreview = () => {
   const [inputText, setInputText] = useState('');
@@ -24,23 +25,15 @@ const HumanizedTextPreview = () => {
 
   // Load API key from localStorage on component mount
   useEffect(() => {
-    const savedKey = localStorage.getItem('gemini_api_key');
+    const savedKey = apiKeyManager.getApiKey();
     if (savedKey) {
       setApiKey(savedKey);
-      // Update the API key in the service
-      if (typeof window !== 'undefined') {
-        (window as any).geminiApiKey = savedKey;
-      }
     }
   }, []);
 
   const handleApiKeySubmit = (key: string) => {
-    localStorage.setItem('gemini_api_key', key);
+    apiKeyManager.setApiKey(key);
     setApiKey(key);
-    // Update the API key in the service
-    if (typeof window !== 'undefined') {
-      (window as any).geminiApiKey = key;
-    }
     toast({
       title: "API Key Saved",
       description: "Your API key has been saved to your browser's local storage.",
@@ -109,7 +102,9 @@ const HumanizedTextPreview = () => {
 
     setIsLoading(true);
     try {
-      const humanized = await geminiService.humanizeAI(inputText);
+      const systemPrompt = getSystemPrompt(style);
+      // Pass the style prompt to the service
+      const humanized = await geminiService.humanizeAI(inputText, systemPrompt);
       setHumanizedText(humanized);
       toast({
         title: "Success",

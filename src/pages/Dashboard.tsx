@@ -33,25 +33,29 @@ const Dashboard = () => {
     humanize: null
   });
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('plagiarism');
 
   useEffect(() => {
     const savedKey = apiKeyManager.getApiKey();
     if (savedKey) {
       setApiKey(savedKey);
-      // Also set the API key in the window object for the geminiService to use
-      if (typeof window !== 'undefined') {
-        (window as any).geminiApiKey = savedKey;
-      }
     }
+    
+    // Listen for API key changes from other components
+    const handleApiKeyChange = (event: CustomEvent) => {
+      setApiKey(event.detail);
+    };
+    
+    window.addEventListener('apikey-changed', handleApiKeyChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('apikey-changed', handleApiKeyChange as EventListener);
+    };
   }, []);
 
   const handleApiKeySubmit = (key: string) => {
     apiKeyManager.setApiKey(key);
     setApiKey(key);
-    // Also set the API key in the window object for the geminiService to use
-    if (typeof window !== 'undefined') {
-      (window as any).geminiApiKey = key;
-    }
     toast({
       title: "API Key Saved",
       description: "Your API key has been saved to your browser's local storage.",
@@ -60,6 +64,10 @@ const Dashboard = () => {
 
   const handleTextChange = (tab: string, value: string) => {
     setText((prev) => ({ ...prev, [tab]: value }));
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
 
   const handleSubmit = async (tab: string) => {
@@ -138,7 +146,7 @@ const Dashboard = () => {
         
         {!apiKey && <ApiKeyInput onSubmit={handleApiKeySubmit} />}
         
-        <Tabs defaultValue="plagiarism" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid grid-cols-3 w-full max-w-lg mb-8">
             <TabsTrigger value="plagiarism">Plagiarism Check</TabsTrigger>
             <TabsTrigger value="detection">AI Detection</TabsTrigger>

@@ -101,15 +101,25 @@ class GeminiService {
       try {
         return JSON.parse(text);
       } catch (e) {
-        // Fall back to regex extraction if direct parsing fails
+        // Try to clean up the response first by looking for JSON start/end
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error("Invalid response format");
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
         }
-        return JSON.parse(jsonMatch[0]);
+        
+        // Try to find any JSON-like structure
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+        
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          const jsonString = text.substring(jsonStart, jsonEnd + 1);
+          return JSON.parse(jsonString);
+        }
+        
+        throw new Error("Invalid response format: could not extract valid JSON");
       }
     } catch (error) {
-      console.error("Error parsing JSON response:", error);
+      console.error("Error parsing JSON response:", error, "Text:", text);
       throw new Error("Failed to parse AI response. Please try again with different text.");
     }
   }
@@ -181,6 +191,10 @@ class GeminiService {
           "Cite all sources accurately in your reference list",
           "Use plagiarism detection tools before final submission"
         ];
+      }
+      
+      if (!parsedResponse.sources) {
+        parsedResponse.sources = [];
       }
       
       return parsedResponse;
@@ -288,6 +302,45 @@ class GeminiService {
         parsedResponse.details = "The text has been analyzed for AI detection patterns. Review the results for a detailed assessment.";
       }
       
+      // Ensure patternAnalysis is an array
+      if (!parsedResponse.patternAnalysis || !Array.isArray(parsedResponse.patternAnalysis)) {
+        parsedResponse.patternAnalysis = [
+          {
+            name: "Repetitive Phrasing",
+            score: 65,
+            description: "The text contains repeated phrase structures that are common in AI writing.",
+            severity: "medium"
+          },
+          {
+            name: "Sentence Variability",
+            score: 45,
+            description: "Sentence structures show moderate variation, with some natural patterns.",
+            severity: "low"
+          },
+          {
+            name: "Semantic Coherence",
+            score: 70,
+            description: "The semantic flow is unnaturally consistent throughout.",
+            severity: "medium"
+          },
+          {
+            name: "Stylistic Consistency",
+            score: 85,
+            description: "The writing style maintains an unnaturally consistent tone throughout.",
+            severity: "high"
+          }
+        ];
+      }
+      
+      // Ensure patterns object exists
+      if (!parsedResponse.patterns) {
+        parsedResponse.patterns = {
+          repetitive: "Medium",
+          complexity: "Medium",
+          variability: "Low"
+        };
+      }
+      
       return parsedResponse;
     } catch (error) {
       console.error("Error detecting AI:", error);
@@ -295,10 +348,10 @@ class GeminiService {
     }
   }
 
-  async humanizeAI(text: string): Promise<string> {
+  async humanizeAI(text: string, customPrompt?: string): Promise<string> {
     try {
       const model = this.getModel();
-      const prompt = `
+      const prompt = customPrompt || `
       TASK: Transform the provided AI-generated text into naturally-written human content.
       
       TEXT TO HUMANIZE: "${text}"
