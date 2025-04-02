@@ -2,6 +2,9 @@
 
 A comprehensive text analysis platform for detecting AI-generated content, checking plagiarism, and humanizing AI text.
 
+🌐 **[Live Demo](https://writegenuine.netlify.app/)**
+
+
 ## ✨ Features
 
 - **🔍 Plagiarism Checker**: Compare your content against billions of web pages to identify potential plagiarism
@@ -25,7 +28,7 @@ A comprehensive text analysis platform for detecting AI-generated content, check
 
 1. Clone the repository
 ```sh
-git clone https://github.com/yourusername/authenticity-haven.git
+git clone https://github.com/midlaj-muhammed/WriteGenuine.git
 cd authenticity-haven
 ```
 
