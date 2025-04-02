@@ -38,12 +38,20 @@ const Dashboard = () => {
     const savedKey = apiKeyManager.getApiKey();
     if (savedKey) {
       setApiKey(savedKey);
+      // Also set the API key in the window object for the geminiService to use
+      if (typeof window !== 'undefined') {
+        (window as any).geminiApiKey = savedKey;
+      }
     }
   }, []);
 
   const handleApiKeySubmit = (key: string) => {
     apiKeyManager.setApiKey(key);
     setApiKey(key);
+    // Also set the API key in the window object for the geminiService to use
+    if (typeof window !== 'undefined') {
+      (window as any).geminiApiKey = key;
+    }
     toast({
       title: "API Key Saved",
       description: "Your API key has been saved to your browser's local storage.",
@@ -83,10 +91,10 @@ const Dashboard = () => {
       } else if (tab === 'detection') {
         result = await geminiService.detectAI(text[tab]);
       } else if (tab === 'humanize') {
-        result = await geminiService.humanizeAI(text[tab]);
+        const humanizedText = await geminiService.humanizeAI(text[tab]);
         result = {
           originalText: text.humanize,
-          humanizedText: result,
+          humanizedText: humanizedText,
           humanScore: 92
         };
       }
@@ -100,9 +108,11 @@ const Dashboard = () => {
       console.error(`Error in ${tab}:`, error);
       toast({
         title: "Analysis Failed",
-        description: `Failed to complete ${tab} analysis. Please try again.`,
+        description: `Failed to complete ${tab} analysis. Please check your API key and try again.`,
         variant: "destructive"
       });
+      // Reset result to ensure the UI doesn't display partial/incorrect data
+      setResults((prev) => ({ ...prev, [tab]: null }));
     } finally {
       setIsLoading((prev) => ({ ...prev, [tab]: false }));
     }
@@ -152,7 +162,7 @@ const Dashboard = () => {
                 <div className="text-right">
                   <Button 
                     onClick={() => handleSubmit('plagiarism')} 
-                    disabled={isLoading.plagiarism || !text.plagiarism.trim()}
+                    disabled={isLoading.plagiarism || !text.plagiarism.trim() || !apiKey}
                   >
                     {isLoading.plagiarism ? (
                       <>
@@ -195,7 +205,7 @@ const Dashboard = () => {
                 <div className="text-right">
                   <Button 
                     onClick={() => handleSubmit('detection')} 
-                    disabled={isLoading.detection || !text.detection.trim()}
+                    disabled={isLoading.detection || !text.detection.trim() || !apiKey}
                   >
                     {isLoading.detection ? (
                       <>
@@ -238,7 +248,7 @@ const Dashboard = () => {
                 <div className="text-right">
                   <Button 
                     onClick={() => handleSubmit('humanize')} 
-                    disabled={isLoading.humanize || !text.humanize.trim()}
+                    disabled={isLoading.humanize || !text.humanize.trim() || !apiKey}
                   >
                     {isLoading.humanize ? (
                       <>
