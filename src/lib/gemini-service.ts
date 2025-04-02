@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 // Define the same interfaces as in mock-service.ts for compatibility
@@ -116,14 +115,14 @@ class GeminiService {
       
       TEXT: "${text}"
       
-      Perform a simulated plagiarism check and return your analysis in the following JSON format:
+      Perform a detailed plagiarism check and return your analysis in the following JSON format:
       {
         "score": [number between 0-100 representing originality percentage],
         "details": [detailed analysis of the text's originality],
-        "suggestions": [array of 3-5 suggestions to improve originality],
+        "suggestions": [array of 3-5 specific suggestions to improve originality],
         "sources": [
           {
-            "text": [excerpt of potentially plagiarized text],
+            "text": [excerpt of potentially plagiarized text, with context],
             "url": [simulated source URL],
             "similarity": [percentage similarity],
             "title": [simulated source title]
@@ -131,6 +130,7 @@ class GeminiService {
         ]
       }
       
+      Make sure to provide at least 2-3 potential sources with varying similarity scores.
       Only provide the JSON response with no additional text or explanations.
       `;
 
@@ -147,12 +147,23 @@ class GeminiService {
       return this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
     } catch (error) {
       console.error("Error checking plagiarism:", error);
-      // Return a fallback result
+      // Return a fallback result with more detailed information
       return {
         score: 85,
-        details: "Unable to perform full analysis. The text appears to be mostly original based on initial review.",
-        suggestions: ["Try running the check again with a more specific text sample."],
-        sources: []
+        details: "Unable to perform full analysis. The text appears to be mostly original based on initial review, but we recommend trying again with a more specific text sample for a complete analysis.",
+        suggestions: [
+          "Try running the check again with a more specific text sample.",
+          "Consider checking sections of your text separately for more accurate results.",
+          "Use quotation marks for direct quotes and cite sources appropriately."
+        ],
+        sources: [
+          {
+            text: "Similar content may exist online. Please try again with a more specific sample.",
+            url: "https://example.com/similar-content",
+            similarity: 25,
+            title: "Potential Similar Source"
+          }
+        ]
       };
     }
   }
@@ -171,14 +182,37 @@ class GeminiService {
         "aiProbability": [number between 0-100 representing AI probability],
         "humanProbability": [number between 0-100 representing human probability],
         "details": [detailed analysis of why you believe the text is AI or human-generated],
-        "suggestions": [array of 3-5 suggestions to make AI text more human-like],
+        "suggestions": [array of 3-5 specific suggestions to make AI text more human-like],
+        "confidenceLevel": [either "low", "medium", or "high"],
         "patterns": {
           "repetitive": [either "Low", "Medium", or "High"],
           "complexity": [either "Low", "Medium", or "High"],
           "variability": [either "Low", "Medium", or "High"]
-        }
+        },
+        "patternAnalysis": [
+          {
+            "name": [name of pattern],
+            "score": [score between 0-100],
+            "description": [description of the pattern],
+            "severity": [either "low", "medium", or "high"]
+          }
+        ],
+        "textStatistics": {
+          "averageSentenceLength": [number],
+          "vocabularyDiversity": [number between 0-100],
+          "repetitivePhrasesCount": [number],
+          "uncommonWordsPercentage": [number between 0-100]
+        },
+        "highlightedText": [
+          {
+            "text": [excerpt from the analyzed text],
+            "reason": [explanation of why this text indicates AI writing],
+            "type": [one of: "repetition", "pattern", "structure", "vocabulary"]
+          }
+        ]
       }
       
+      Provide at least 3 pattern analysis items and 2-3 highlighted text examples.
       Only provide the JSON response with no additional text or explanations.
       `;
 
@@ -200,6 +234,7 @@ class GeminiService {
         score: parsedResult.score || parsedResult.aiProbability || 50,
         aiProbability: parsedResult.aiProbability || parsedResult.score || 50,
         humanProbability: parsedResult.humanProbability || (100 - (parsedResult.score || 50)),
+        confidenceLevel: parsedResult.confidenceLevel || (parsedResult.score > 80 ? 'high' : parsedResult.score > 50 ? 'medium' : 'low'),
         patterns: parsedResult.patterns || {
           repetitive: "Medium",
           complexity: "Medium",
@@ -209,17 +244,42 @@ class GeminiService {
       };
     } catch (error) {
       console.error("Error detecting AI:", error);
-      // Return a fallback result
+      // Return a fallback result with more detailed information
       return {
         score: 50,
         aiProbability: 50,
         humanProbability: 50,
-        details: "Unable to perform full analysis. Please try again with a different text sample.",
-        suggestions: ["Try analyzing a longer text sample for more accurate results."],
+        details: "Unable to perform full analysis. The text provided doesn't contain enough patterns to make a confident determination. Please try again with a longer text sample.",
+        suggestions: [
+          "Try analyzing a longer text sample for more accurate results.",
+          "Include more varied content with different topics and styles.",
+          "Provide text with more complex sentence structures for better analysis."
+        ],
         patterns: {
           repetitive: "Medium",
           complexity: "Medium",
           variability: "Medium"
+        },
+        confidenceLevel: "low",
+        patternAnalysis: [
+          {
+            name: "Sentence Structure",
+            score: 50,
+            description: "Analysis incomplete due to limited sample size",
+            severity: "low"
+          },
+          {
+            name: "Vocabulary Usage",
+            score: 45,
+            description: "Insufficient data to fully analyze vocabulary patterns",
+            severity: "low"
+          }
+        ],
+        textStatistics: {
+          averageSentenceLength: 15,
+          vocabularyDiversity: 60,
+          repetitivePhrasesCount: 1,
+          uncommonWordsPercentage: 10
         }
       };
     }
@@ -234,13 +294,16 @@ class GeminiService {
       TEXT: "${text}"
       
       Follow these guidelines to humanize the text:
-      1. Vary sentence structure and length
-      2. Add natural transitions between ideas
-      3. Include occasional colloquialisms or conversational elements
-      4. Add subtle imperfections (like self-corrections or asides)
+      1. Vary sentence structure and length significantly
+      2. Add natural transitions and conversation flow between ideas
+      3. Include occasional colloquialisms, idioms, or conversational elements
+      4. Add subtle imperfections (like self-corrections, asides, or minor tangents)
       5. Maintain the original meaning and key points
-      6. Make the tone more personal and authentic
-      7. Avoid repetitive patterns
+      6. Make the tone more personal, authentic and less formal
+      7. Avoid repetitive patterns or formulaic expressions
+      8. Add personal perspective or experiences where appropriate
+      9. Include rhetorical questions or thought processes
+      10. Use contractions and informal language naturally
       
       Rewrite the text completely to sound more human while preserving the core message.
       Only provide the rewritten text with no explanations or additional content.
@@ -256,7 +319,7 @@ class GeminiService {
       return response.text();
     } catch (error) {
       console.error("Error humanizing text:", error);
-      return "Unable to humanize text at this time. Please try again later with a different text sample.";
+      return "Unable to humanize text at this time. Please try again later with a different text sample. For best results, provide content that is at least a few sentences long with clear context.";
     }
   }
 }

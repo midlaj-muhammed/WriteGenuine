@@ -24,6 +24,10 @@ const apiKeyManager = {
       localStorage.setItem('gemini_api_key', key);
       // Set a global variable that can be accessed by the service
       (window as any).geminiApiKey = key;
+      
+      // Dispatch an event to notify other components about the API key change
+      const event = new CustomEvent('apikey-changed', { detail: key });
+      window.dispatchEvent(event);
     }
   },
 
@@ -37,6 +41,10 @@ const apiKeyManager = {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('gemini_api_key');
       delete (window as any).geminiApiKey;
+      
+      // Dispatch an event to notify other components about the API key change
+      const event = new CustomEvent('apikey-changed', { detail: null });
+      window.dispatchEvent(event);
     }
   }
 };
