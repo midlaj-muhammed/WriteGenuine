@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,15 +45,6 @@ const ContentAnalyzer = () => {
   };
 
   const handleAnalyze = async () => {
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your Google Generative AI API key to use this feature.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (!text.trim()) {
       toast({
         title: "Text Required",
@@ -241,8 +231,6 @@ const ContentAnalyzer = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {!apiKey && renderApiKeyInput()}
-      
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="plagiarism">Plagiarism Check</TabsTrigger>

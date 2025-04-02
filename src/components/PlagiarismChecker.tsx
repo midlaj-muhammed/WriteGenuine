@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,15 +54,6 @@ const PlagiarismChecker = () => {
   };
 
   const handleCheck = async () => {
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your Google Generative AI API key to use this feature.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (!inputText.trim()) {
       toast({
         title: "Text Required",
@@ -140,34 +130,6 @@ const PlagiarismChecker = () => {
 
       {/* Content */}
       <div className="p-6 space-y-6">
-        {!apiKey && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">API Key Required</CardTitle>
-              <CardDescription>
-                Please enter your Google Generative AI API key to use this feature
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <Input 
-                  type="password" 
-                  placeholder="Enter API key..." 
-                  value={apiKey || ''}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="flex-1"
-                />
-                <Button onClick={() => handleApiKeySubmit(apiKey || '')} disabled={!apiKey?.trim()}>
-                  Save Key
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Your API key will only be stored in your browser's local storage.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Input Section */}
         <div>
           <label className="block text-sm font-medium mb-2">Text to Check</label>
@@ -186,7 +148,7 @@ const PlagiarismChecker = () => {
         <div className="flex justify-end">
           <Button
             onClick={handleCheck}
-            disabled={isLoading || !inputText.trim() || !apiKey}
+            disabled={isLoading || !inputText.trim()}
             className="gap-2"
           >
             {isLoading ? (

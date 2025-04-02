@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
@@ -71,15 +70,6 @@ const Dashboard = () => {
   };
 
   const handleSubmit = async (tab: string) => {
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your Google Generative AI API key to use this feature.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (!text[tab].trim()) {
       toast({
         title: "Text Required",
@@ -143,8 +133,6 @@ const Dashboard = () => {
             Use our tools to check, detect, and humanize your content.
           </p>
         </div>
-        
-        {!apiKey && <ApiKeyInput onSubmit={handleApiKeySubmit} />}
         
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid grid-cols-3 w-full max-w-lg mb-8">

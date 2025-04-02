@@ -1,69 +1,81 @@
-# Welcome to your Lovable project
+# ✅ Authenticity Haven
 
-## Project info
+A comprehensive text analysis platform for detecting AI-generated content, checking plagiarism, and humanizing AI text.
 
-**URL**: https://lovable.dev/projects/5dd81149-9ecc-4352-ba2a-7e3f1d2e3200
+## ✨ Features
 
-## How can I edit this code?
+- **🔍 Plagiarism Checker**: Compare your content against billions of web pages to identify potential plagiarism
+- **🤖 AI Detection**: Analyze text to determine if it was written by AI or a human
+- **👤 AI Humanizer**: Transform AI-generated text into natural human writing that bypasses detection
 
-There are several ways of editing your application.
+## 🛠️ Technology Stack
 
-**Use Lovable**
+- **⚛️ Frontend**: React, TypeScript, Vite
+- **🎨 UI Components**: shadcn/ui, Tailwind CSS
+- **🧠 AI Integration**: Google Generative AI (Gemini)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5dd81149-9ecc-4352-ba2a-7e3f1d2e3200) and start prompting.
+## 🚀 Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📋 Prerequisites
 
-**Use your preferred IDE**
+- Node.js (v16 or later)
+- npm or yarn
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 📥 Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
+1. Clone the repository
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+git clone https://github.com/yourusername/authenticity-haven.git
+cd authenticity-haven
 ```
 
-**Edit a file directly in GitHub**
+2. Install dependencies
+```sh
+npm install
+# or
+yarn install
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Start the development server
+```sh
+npm run dev
+# or
+yarn dev
+```
 
-**Use GitHub Codespaces**
+4. Access the application at `http://localhost:5173`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🔑 API Key Configuration
 
-## What technologies are used for this project?
+This project uses Google's Generative AI (Gemini) API. An API key is already preconfigured in the application, so you can start using all features immediately without needing to obtain your own API key.
 
-This project is built with .
+If you want to use your own API key:
+1. Get an API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Open `src/lib/api-key-manager.ts`
+3. Replace the value of `DEFAULT_API_KEY` with your own API key
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📝 Usage
 
-## How can I deploy this project?
+1. Navigate to the dashboard
+2. Select the tool you want to use (Plagiarism Checker, AI Detection, or AI Humanizer)
+3. Enter or paste your text
+4. Click the corresponding action button to analyze or transform your text
 
-Simply open [Lovable](https://lovable.dev/projects/5dd81149-9ecc-4352-ba2a-7e3f1d2e3200) and click on Share -> Publish.
+## 🏗️ Building for Production
 
-## I want to use a custom domain - is that possible?
+```sh
+npm run build
+# or
+yarn build
+```
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+The build artifacts will be stored in the `dist/` directory, ready to be deployed.
+
+## ⚖️ License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [shadcn/ui](https://ui.shadcn.com/) components
+- Powered by [Google Generative AI](https://ai.google.dev/)
