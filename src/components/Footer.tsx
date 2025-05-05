@@ -9,9 +9,12 @@ const Footer = () => {
       <div className="container max-w-7xl mx-auto px-6 md:px-10">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           <div className="md:col-span-2">
-            <Link to="/" className="text-2xl font-bold mb-4 inline-block">WriteGenuine</Link>
+            <Link to="/" className="flex items-center gap-2 mb-4">
+              <img src="/logo.svg" alt="WriteGenuine Logo" className="h-10 w-10" />
+              <span className="text-2xl font-bold text-foreground tracking-tight">WriteGenuine</span>
+            </Link>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Ensuring originality in content with powerful plagiarism checking, AI detection, 
+              Ensuring originality in content with powerful plagiarism checking, AI detection,
               and humanization tools. Create authentic, high-quality writing effortlessly.
             </p>
             <div className="flex space-x-4">
@@ -20,7 +23,7 @@ const Footer = () => {
               <SocialLink href="https://linkedin.com" icon={<Linkedin size={18} />} />
             </div>
           </div>
-          
+
           <div>
             <h3 className="font-bold text-lg mb-4">Product</h3>
             <ul className="space-y-3">
@@ -30,7 +33,7 @@ const Footer = () => {
               <FooterLink href="/#faq">FAQ</FooterLink>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="font-bold text-lg mb-4">Company</h3>
             <ul className="space-y-3">
@@ -41,7 +44,7 @@ const Footer = () => {
             </ul>
           </div>
         </div>
-        
+
         <div className="mt-16 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">
@@ -63,9 +66,9 @@ const Footer = () => {
 };
 
 const SocialLink = ({ href, icon }: { href: string, icon: React.ReactNode }) => (
-  <a 
-    href={href} 
-    target="_blank" 
+  <a
+    href={href}
+    target="_blank"
     rel="noopener noreferrer"
     className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
   >
@@ -75,8 +78,8 @@ const SocialLink = ({ href, icon }: { href: string, icon: React.ReactNode }) => 
 
 const FooterLink = ({ href, children }: { href: string, children: React.ReactNode }) => (
   <li>
-    <Link 
-      to={href} 
+    <Link
+      to={href}
       className="text-muted-foreground hover:text-foreground transition-colors"
     >
       {children}
