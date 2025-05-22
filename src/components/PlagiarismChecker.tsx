@@ -57,7 +57,7 @@ const PlagiarismChecker = () => {
         toast({
           title: "API Rate Limit Reached",
           description: "Using fallback mode with simulated results. Quality may be reduced.",
-          variant: "warning"
+          variant: "default" // Changed from "warning" to "default"
         });
       }
       
