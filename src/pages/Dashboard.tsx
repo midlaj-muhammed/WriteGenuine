@@ -1,14 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ShieldCheck, Bot, RefreshCw, Loader2 } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { toast } from '@/components/ui/use-toast';
 import { geminiService } from '@/lib/gemini-service';
-import ApiKeyInput from '@/components/dashboard/ApiKeyInput';
 import ToolCard from '@/components/dashboard/ToolCard';
 import PlagiarismResults from '@/components/dashboard/PlagiarismResults';
 import DetectionResults from '@/components/dashboard/DetectionResults';
@@ -31,35 +30,13 @@ const Dashboard = () => {
     detection: null,
     humanize: null
   });
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('plagiarism');
 
+  // Set the default API key on component mount
   useEffect(() => {
-    const savedKey = apiKeyManager.getApiKey();
-    if (savedKey) {
-      setApiKey(savedKey);
-    }
-    
-    // Listen for API key changes from other components
-    const handleApiKeyChange = (event: CustomEvent) => {
-      setApiKey(event.detail);
-    };
-    
-    window.addEventListener('apikey-changed', handleApiKeyChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('apikey-changed', handleApiKeyChange as EventListener);
-    };
+    // Ensure the API key is set globally
+    apiKeyManager.getApiKey();
   }, []);
-
-  const handleApiKeySubmit = (key: string) => {
-    apiKeyManager.setApiKey(key);
-    setApiKey(key);
-    toast({
-      title: "API Key Saved",
-      description: "Your API key has been saved to your browser's local storage.",
-    });
-  };
 
   const handleTextChange = (tab: string, value: string) => {
     setText((prev) => ({ ...prev, [tab]: value }));
@@ -112,7 +89,7 @@ const Dashboard = () => {
       console.error(`Error in ${tab}:`, error);
       toast({
         title: "Analysis Failed",
-        description: `Failed to complete ${tab} analysis. Please check your API key and try again.`,
+        description: `Failed to complete ${tab} analysis. Please try again later.`,
         variant: "destructive"
       });
       // Reset result to ensure the UI doesn't display partial/incorrect data
@@ -162,10 +139,9 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('plagiarism')} 
-                    disabled={isLoading.plagiarism || !text.plagiarism.trim() || !apiKey}
+                    disabled={isLoading.plagiarism || !text.plagiarism.trim()}
                     className="w-full sm:w-auto"
                   >
                     {isLoading.plagiarism ? (
@@ -207,10 +183,9 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('detection')} 
-                    disabled={isLoading.detection || !text.detection.trim() || !apiKey}
+                    disabled={isLoading.detection || !text.detection.trim()}
                     className="w-full sm:w-auto"
                   >
                     {isLoading.detection ? (
@@ -252,10 +227,9 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('humanize')} 
-                    disabled={isLoading.humanize || !text.humanize.trim() || !apiKey}
+                    disabled={isLoading.humanize || !text.humanize.trim()}
                     className="w-full sm:w-auto"
                   >
                     {isLoading.humanize ? (

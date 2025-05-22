@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +10,8 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/signup";
 import NotFound from "./pages/NotFound";
+import apiKeyManager from "./lib/api-key-manager";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -22,9 +25,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => (
   </>
 );
 
+// Initialize API key globally
+const ApiKeyInitializer = () => {
+  useEffect(() => {
+    // Set the API key globally on app start
+    apiKeyManager.getApiKey();
+  }, []);
+  
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <ApiKeyInitializer />
       <Toaster />
       <Sonner />
       <BrowserRouter>

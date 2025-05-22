@@ -4,9 +4,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { geminiService } from '@/lib/gemini-service';
+import apiKeyManager from '@/lib/api-key-manager';
 
 interface Source {
   url: string;
@@ -26,33 +26,13 @@ const PlagiarismChecker = () => {
   const [inputText, setInputText] = useState('');
   const [result, setResult] = useState<PlagiarismResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
 
-  // Load API key from localStorage on component mount
+  // Set the default API key on component mount
   useEffect(() => {
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) {
-      setApiKey(savedKey);
-      // Update the API key in the service
-      if (typeof window !== 'undefined') {
-        (window as any).geminiApiKey = savedKey;
-      }
-    }
+    // Ensure the API key is set globally
+    apiKeyManager.getApiKey();
   }, []);
-
-  const handleApiKeySubmit = (key: string) => {
-    localStorage.setItem('gemini_api_key', key);
-    setApiKey(key);
-    // Update the API key in the service
-    if (typeof window !== 'undefined') {
-      (window as any).geminiApiKey = key;
-    }
-    toast({
-      title: "API Key Saved",
-      description: "Your API key has been saved to your browser's local storage.",
-    });
-  };
 
   const handleCheck = async () => {
     if (!inputText.trim()) {
@@ -122,7 +102,7 @@ const PlagiarismChecker = () => {
         toast({
           title: "Analysis Failed",
           description: errorMessage.includes("API key") 
-            ? "API key validation failed. Please check your API key in settings and try again."
+            ? "API key validation failed. Please contact support."
             : "Failed to complete plagiarism analysis. Please try again later.",
           variant: "destructive"
         });
@@ -173,7 +153,7 @@ const PlagiarismChecker = () => {
               <p className="font-medium text-amber-700">Limited Service Mode</p>
               <p className="text-amber-600 mt-1">
                 API rate limits have been reached. You're seeing fallback results with reduced quality. 
-                For best results, try again later or upgrade to a paid API key.
+                For best results, try again later.
               </p>
             </div>
           </div>

@@ -1,10 +1,11 @@
+
 // This is a helper module to manage API keys across components
 
 // Create a way to manage the API key globally to avoid repetition
 const apiKeyManager = {
   // Constants for storage keys
   API_KEY_STORAGE_KEY: 'gemini_api_key',
-  DEFAULT_API_KEY: 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA', // Google Gemini API key
+  DEFAULT_API_KEY: 'AIzaSyCfybgjLfBM543cFSc-kbAoqcRSlLD8yxo', // Updated Gemini API key
   
   // Retrieve the API key from localStorage or use the default
   getApiKey: (): string | null => {

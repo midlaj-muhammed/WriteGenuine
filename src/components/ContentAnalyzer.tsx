@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,7 +10,6 @@ import { Loader2, AlertCircle, CheckCircle2, Check, Copy, Info } from 'lucide-re
 import { geminiService, ContentAnalysisResult } from '@/lib/gemini-service';
 import { type AIDetectionResult } from '@/lib/gemini-service';
 import { toast } from '@/components/ui/use-toast';
-import { Input } from '@/components/ui/input';
 import apiKeyManager from '@/lib/api-key-manager';
 
 interface AnalysisState {
@@ -24,25 +24,13 @@ const ContentAnalyzer = () => {
   const [analysis, setAnalysis] = useState<AnalysisState>({
     loading: false,
   });
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Load API key from localStorage on component mount
+  // Set the default API key on component mount
   useEffect(() => {
-    const savedKey = apiKeyManager.getApiKey();
-    if (savedKey) {
-      setApiKey(savedKey);
-    }
+    // Ensure the API key is set globally
+    apiKeyManager.getApiKey();
   }, []);
-
-  const handleApiKeySubmit = (key: string) => {
-    apiKeyManager.setApiKey(key);
-    setApiKey(key);
-    toast({
-      title: "API Key Saved",
-      description: "Your API key has been saved to your browser's local storage.",
-    });
-  };
 
   const handleAnalyze = async () => {
     if (!text.trim()) {
@@ -82,7 +70,7 @@ const ContentAnalyzer = () => {
       });
       toast({
         title: "Analysis Failed",
-        description: "Please check your API key and try again.",
+        description: "Unable to process your request. Please try again later.",
         variant: "destructive"
       });
     }
@@ -98,36 +86,6 @@ const ContentAnalyzer = () => {
         description: "Text copied to clipboard.",
       });
     }
-  };
-
-  const renderApiKeyInput = () => {
-    return (
-      <Card className="p-4 mb-6">
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold">API Key Required</h3>
-            <p className="text-sm text-muted-foreground">
-              Enter your Google Generative AI API key to use this feature
-            </p>
-          </div>
-          <div className="flex gap-4">
-            <Input
-              type="password"
-              placeholder="Enter API key..."
-              value={apiKey || ''}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={() => handleApiKeySubmit(apiKey || '')} disabled={!apiKey?.trim()}>
-              Save Key
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Your API key will only be stored in your browser's local storage.
-          </p>
-        </div>
-      </Card>
-    );
   };
 
   const renderResult = () => {
@@ -248,7 +206,7 @@ const ContentAnalyzer = () => {
 
           <Button
             onClick={handleAnalyze}
-            disabled={analysis.loading || !apiKey}
+            disabled={analysis.loading}
             className="w-full"
           >
             {analysis.loading ? (

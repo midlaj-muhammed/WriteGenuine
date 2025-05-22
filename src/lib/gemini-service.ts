@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import apiKeyManager from "@/lib/api-key-manager";
 
 // Define the same interfaces as in mock-service.ts for compatibility
 export interface PlagiarismSource {
@@ -92,32 +93,7 @@ class GeminiService {
   private useRateLimitFallback = true; // Whether to use mock data when rate limited
 
   private getApiKey(): string {
-    // Try to get the API key from localStorage first
-    try {
-      if (typeof window !== 'undefined') {
-        // If the key is already in window object, use it
-        if ((window as any).geminiApiKey) {
-          return (window as any).geminiApiKey;
-        }
-        
-        // Get from localStorage with fallback to the default API key
-        const key = localStorage.getItem('gemini_api_key') || 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA';
-        
-        // Always set it on window for consistency
-        if (key) {
-          (window as any).geminiApiKey = key;
-          console.log("API Key loaded", key.substring(0, 8) + "...");
-        }
-        
-        return key;
-      }
-    } catch (e) {
-      console.error("Error retrieving API key:", e);
-    }
-    
-    // Fallback to the default key if storage access fails
-    console.log("Using default API key");
-    return 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA';
+    return apiKeyManager.getApiKey() || 'AIzaSyCfybgjLfBM543cFSc-kbAoqcRSlLD8yxo';
   }
 
   private getModel() {
