@@ -46,7 +46,51 @@ export interface ContentAnalysisResult {
   sources?: PlagiarismSource[];
 }
 
+// Mock data for fallback when API limits are exceeded
+const mockPlagiarismResult: ContentAnalysisResult = {
+  score: 87,
+  details: "This text appears to be mostly original. Our analysis did not find significant matches with existing content across the web. While there are some common phrases that naturally occur in writing on this topic, the overall structure and expression appear to be unique. Note: This is a fallback result due to API rate limits being exceeded.",
+  suggestions: [
+    "Always cite any reference materials used in your research",
+    "Use quotation marks for direct quotes from sources",
+    "Paraphrase information in your own words when appropriate",
+    "Maintain a bibliography of all sources consulted"
+  ],
+  sources: [
+    {
+      text: "This is a common phrase in academic writing",
+      url: "https://example-academic-source.edu/writing-guide",
+      similarity: 22,
+      title: "Academic Writing Guide"
+    }
+  ]
+};
+
+const mockAIDetectionResult: AIDetectionResult = {
+  score: 65,
+  aiProbability: 65,
+  humanProbability: 35,
+  details: "The text shows mixed signals of both AI and human writing patterns. While there are some structural elements typical of AI generation, there are also variations in style that suggest human input or editing. Note: This is a fallback result due to API rate limits being exceeded.",
+  suggestions: [
+    "Vary sentence structures more frequently",
+    "Incorporate more personal anecdotes or experiences",
+    "Use more colloquial expressions where appropriate",
+    "Break predictable patterns with occasional short sentences"
+  ],
+  confidenceLevel: 'medium',
+  patterns: {
+    repetitive: "Medium",
+    complexity: "Medium",
+    variability: "Low"
+  }
+};
+
 class GeminiService {
+  // Add retry configuration
+  private maxRetries = 2;
+  private retryDelay = 1000; // Base delay in ms
+  private useRateLimitFallback = true; // Whether to use mock data when rate limited
+
   private getApiKey(): string {
     // Try to get the API key from localStorage first
     try {
@@ -149,6 +193,41 @@ class GeminiService {
     }
   }
 
+  // Add retry logic with exponential backoff
+  private async retryableRequest<T>(requestFn: () => Promise<T>, retries = this.maxRetries): Promise<T> {
+    try {
+      return await requestFn();
+    } catch (error: any) {
+      if (retries <= 0) {
+        // If we've used all retries and have fallback enabled, check if it's a rate limit error
+        if (this.useRateLimitFallback && 
+            (error.status === 429 || 
+             (error.message && (
+               error.message.includes("quota") || 
+               error.message.includes("rate limit") || 
+               error.message.includes("Too Many Requests")
+             ))
+            )
+           ) {
+          console.log("Rate limit reached, using fallback data");
+          throw new Error("RATE_LIMIT_FALLBACK");
+        }
+        throw error;
+      }
+
+      // Check if it's a retryable error (rate limit, timeout, etc.)
+      if (error.status === 429 || error.status === 500 || error.status === 503) {
+        const delay = this.retryDelay * Math.pow(2, this.maxRetries - retries);
+        console.log(`Retrying after ${delay}ms (${retries} retries left)...`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.retryableRequest(requestFn, retries - 1);
+      }
+
+      throw error;
+    }
+  }
+
   async checkPlagiarism(text: string): Promise<ContentAnalysisResult> {
     try {
       console.log("Starting plagiarism check...");
@@ -190,48 +269,61 @@ class GeminiService {
       `;
 
       console.log("Sending request to Gemini API...");
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: this.generationConfig,
-        safetySettings: this.safetySettings,
-      });
+      
+      // Use retryable request
+      try {
+        const result = await this.retryableRequest(() => 
+          model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: this.generationConfig,
+            safetySettings: this.safetySettings,
+          })
+        );
 
-      console.log("Received response from Gemini API");
-      const response = result.response;
-      const textResponse = response.text();
-      
-      // Extract JSON from the response
-      console.log("Processing response...");
-      const parsedResponse = this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
-      
-      // Validate and normalize the response
-      if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
-        console.log("Invalid score in response, using fallback");
-        parsedResponse.score = 85; // Default fallback
+        console.log("Received response from Gemini API");
+        const response = result.response;
+        const textResponse = response.text();
+        
+        // Extract JSON from the response
+        console.log("Processing response...");
+        const parsedResponse = this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
+        
+        // Validate and normalize the response
+        if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
+          console.log("Invalid score in response, using fallback");
+          parsedResponse.score = 85; // Default fallback
+        }
+        
+        if (!parsedResponse.details || parsedResponse.details.trim() === '') {
+          console.log("Missing details in response, using fallback");
+          parsedResponse.details = "The text has been analyzed for potential plagiarism. Please review the results.";
+        }
+        
+        if (!parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions) || parsedResponse.suggestions.length === 0) {
+          console.log("Missing suggestions in response, using fallback");
+          parsedResponse.suggestions = [
+            "Ensure all direct quotes are properly cited",
+            "Paraphrase content in your own words",
+            "Cite all sources accurately in your reference list",
+            "Use plagiarism detection tools before final submission"
+          ];
+        }
+        
+        if (!parsedResponse.sources) {
+          console.log("No sources in response, using empty array");
+          parsedResponse.sources = [];
+        }
+        
+        console.log("Plagiarism check completed successfully");
+        return parsedResponse;
+      } catch (error: any) {
+        // Special case for rate limit fallback
+        if (error.message === "RATE_LIMIT_FALLBACK") {
+          console.log("Using mock plagiarism result due to rate limits");
+          return { ...mockPlagiarismResult };
+        }
+        throw error; // Re-throw other errors
       }
-      
-      if (!parsedResponse.details || parsedResponse.details.trim() === '') {
-        console.log("Missing details in response, using fallback");
-        parsedResponse.details = "The text has been analyzed for potential plagiarism. Please review the results.";
-      }
-      
-      if (!parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions) || parsedResponse.suggestions.length === 0) {
-        console.log("Missing suggestions in response, using fallback");
-        parsedResponse.suggestions = [
-          "Ensure all direct quotes are properly cited",
-          "Paraphrase content in your own words",
-          "Cite all sources accurately in your reference list",
-          "Use plagiarism detection tools before final submission"
-        ];
-      }
-      
-      if (!parsedResponse.sources) {
-        console.log("No sources in response, using empty array");
-        parsedResponse.sources = [];
-      }
-      
-      console.log("Plagiarism check completed successfully");
-      return parsedResponse;
     } catch (error: any) {
       console.error("Error checking plagiarism:", error);
       
@@ -240,20 +332,17 @@ class GeminiService {
         throw new Error("API key validation failed. Please check your Google Gemini API key and try again.");
       }
       
-      if (error.status && error.status === 403) {
-        throw new Error("API access forbidden. Your API key might be invalid or has reached its quota limit.");
+      if (error.status === 429 || (error.message && error.message.includes("quota")) || (error.message && error.message.includes("rate limit"))) {
+        throw new Error("Rate limit exceeded. The API is currently unavailable due to high demand. Please try again later.");
       }
       
-      if (error.status && error.status === 429) {
-        throw new Error("Too many requests. You've exceeded the rate limits for the Gemini API. Please try again later.");
-      }
-      
-      throw new Error("Failed to analyze text for plagiarism. Please try again with a different text sample or check your API key.");
+      throw new Error("Failed to analyze text for plagiarism. Please try again later or with different text.");
     }
   }
 
   async detectAI(text: string): Promise<AIDetectionResult> {
     try {
+      console.log("Starting AI detection...");
       const model = this.getModel();
       const prompt = `
       TASK: Perform a comprehensive analysis to determine whether the provided text was written by an AI or a human.
@@ -311,93 +400,112 @@ class GeminiService {
       - Calculate all statistics with mathematical precision
       `;
 
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: this.generationConfig,
-        safetySettings: this.safetySettings,
-      });
+      // Use retryable request
+      try {
+        const result = await this.retryableRequest(() => 
+          model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: this.generationConfig,
+            safetySettings: this.safetySettings,
+          })
+        );
 
-      const response = result.response;
-      const textResponse = response.text();
-      
-      // Extract JSON from the response
-      const parsedResponse = this.extractJsonFromResponse(textResponse) as AIDetectionResult;
-      
-      // Validate and normalize the response
-      if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
-        parsedResponse.score = 50; // Default fallback
-      }
-      
-      if (!parsedResponse.aiProbability || typeof parsedResponse.aiProbability !== 'number') {
-        parsedResponse.aiProbability = parsedResponse.score;
-      }
-      
-      if (!parsedResponse.humanProbability || typeof parsedResponse.humanProbability !== 'number') {
-        parsedResponse.humanProbability = 100 - parsedResponse.score;
-      }
-      
-      if (!parsedResponse.confidenceLevel) {
-        if (parsedResponse.score > 80 || parsedResponse.score < 20) {
-          parsedResponse.confidenceLevel = 'high';
-        } else if (parsedResponse.score > 60 || parsedResponse.score < 40) {
-          parsedResponse.confidenceLevel = 'medium';
-        } else {
-          parsedResponse.confidenceLevel = 'low';
+        const response = result.response;
+        const textResponse = response.text();
+        
+        // Extract JSON from the response
+        const parsedResponse = this.extractJsonFromResponse(textResponse) as AIDetectionResult;
+        
+        // Validate and normalize the response
+        if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
+          parsedResponse.score = 50; // Default fallback
         }
-      }
-      
-      if (!parsedResponse.details || parsedResponse.details.trim() === '') {
-        parsedResponse.details = "The text has been analyzed for AI detection patterns. Review the results for a detailed assessment.";
-      }
-      
-      // Ensure patternAnalysis is an array
-      if (!parsedResponse.patternAnalysis || !Array.isArray(parsedResponse.patternAnalysis)) {
-        parsedResponse.patternAnalysis = [
-          {
-            name: "Repetitive Phrasing",
-            score: 65,
-            description: "The text contains repeated phrase structures that are common in AI writing.",
-            severity: "medium"
-          },
-          {
-            name: "Sentence Variability",
-            score: 45,
-            description: "Sentence structures show moderate variation, with some natural patterns.",
-            severity: "low"
-          },
-          {
-            name: "Semantic Coherence",
-            score: 70,
-            description: "The semantic flow is unnaturally consistent throughout.",
-            severity: "medium"
-          },
-          {
-            name: "Stylistic Consistency",
-            score: 85,
-            description: "The writing style maintains an unnaturally consistent tone throughout.",
-            severity: "high"
+        
+        if (!parsedResponse.aiProbability || typeof parsedResponse.aiProbability !== 'number') {
+          parsedResponse.aiProbability = parsedResponse.score;
+        }
+        
+        if (!parsedResponse.humanProbability || typeof parsedResponse.humanProbability !== 'number') {
+          parsedResponse.humanProbability = 100 - parsedResponse.score;
+        }
+        
+        if (!parsedResponse.confidenceLevel) {
+          if (parsedResponse.score > 80 || parsedResponse.score < 20) {
+            parsedResponse.confidenceLevel = 'high';
+          } else if (parsedResponse.score > 60 || parsedResponse.score < 40) {
+            parsedResponse.confidenceLevel = 'medium';
+          } else {
+            parsedResponse.confidenceLevel = 'low';
           }
-        ];
+        }
+        
+        if (!parsedResponse.details || parsedResponse.details.trim() === '') {
+          parsedResponse.details = "The text has been analyzed for AI detection patterns. Review the results for a detailed assessment.";
+        }
+        
+        // Ensure patternAnalysis is an array
+        if (!parsedResponse.patternAnalysis || !Array.isArray(parsedResponse.patternAnalysis)) {
+          parsedResponse.patternAnalysis = [
+            {
+              name: "Repetitive Phrasing",
+              score: 65,
+              description: "The text contains repeated phrase structures that are common in AI writing.",
+              severity: "medium"
+            },
+            {
+              name: "Sentence Variability",
+              score: 45,
+              description: "Sentence structures show moderate variation, with some natural patterns.",
+              severity: "low"
+            },
+            {
+              name: "Semantic Coherence",
+              score: 70,
+              description: "The semantic flow is unnaturally consistent throughout.",
+              severity: "medium"
+            },
+            {
+              name: "Stylistic Consistency",
+              score: 85,
+              description: "The writing style maintains an unnaturally consistent tone throughout.",
+              severity: "high"
+            }
+          ];
+        }
+        
+        // Ensure patterns object exists
+        if (!parsedResponse.patterns) {
+          parsedResponse.patterns = {
+            repetitive: "Medium",
+            complexity: "Medium",
+            variability: "Low"
+          };
+        }
+        
+        return parsedResponse;
+      } catch (error: any) {
+        // Special case for rate limit fallback
+        if (error.message === "RATE_LIMIT_FALLBACK") {
+          console.log("Using mock AI detection result due to rate limits");
+          return { ...mockAIDetectionResult };
+        }
+        throw error; // Re-throw other errors
       }
-      
-      // Ensure patterns object exists
-      if (!parsedResponse.patterns) {
-        parsedResponse.patterns = {
-          repetitive: "Medium",
-          complexity: "Medium",
-          variability: "Low"
-        };
-      }
-      
-      return parsedResponse;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error detecting AI:", error);
-      throw new Error("Failed to analyze text for AI detection. Please try again with a different text sample or check your API key.");
+      
+      // Handle rate limits
+      if (error.status === 429 || (error.message && error.message.includes("quota")) || (error.message && error.message.includes("rate limit"))) {
+        throw new Error("Rate limit exceeded. The API is currently unavailable due to high demand. Please try again later.");
+      }
+      
+      throw new Error("Failed to analyze text for AI detection. Please try again later or with different text.");
     }
   }
 
   async humanizeAI(text: string, customPrompt?: string): Promise<string> {
     try {
+      console.log("Starting text humanization...");
       const model = this.getModel();
       const prompt = customPrompt || `
       TASK: Transform the provided AI-generated text into naturally-written human content.
@@ -424,27 +532,47 @@ class GeminiService {
       - Ensure the tone matches realistic human expert communication
       `;
 
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          ...this.generationConfig,
-          temperature: 0.7, // Higher temperature for more creative humanization
-        },
-        safetySettings: this.safetySettings,
-      });
+      // Use retryable request
+      try {
+        const result = await this.retryableRequest(() => 
+          model.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              ...this.generationConfig,
+              temperature: 0.7, // Higher temperature for more creative humanization
+            },
+            safetySettings: this.safetySettings,
+          })
+        );
 
-      const response = result.response;
-      const humanizedText = response.text();
+        const response = result.response;
+        const humanizedText = response.text();
+        
+        // Verify the response has content
+        if (!humanizedText || humanizedText.trim().length === 0) {
+          throw new Error("Empty response received");
+        }
+        
+        return humanizedText;
+      } catch (error: any) {
+        // Special case for rate limit fallback - use simple fallback for humanization
+        if (error.message === "RATE_LIMIT_FALLBACK") {
+          console.log("Using basic humanization fallback due to rate limits");
+          return "I've tried to humanize your text, but our service is currently experiencing high demand. " +
+                 "Here's your original text with minor modifications:\n\n" + 
+                 text.replace(/\./g, '.\n').replace(/\n\n/g, '\n');
+        }
+        throw error; // Re-throw other errors
+      }
+    } catch (error: any) {
+      console.error("Error humanizing text:", error);
       
-      // Verify the response has content
-      if (!humanizedText || humanizedText.trim().length === 0) {
-        throw new Error("Empty response received");
+      // Handle rate limits
+      if (error.status === 429 || (error.message && error.message.includes("quota")) || (error.message && error.message.includes("rate limit"))) {
+        throw new Error("Rate limit exceeded. The API is currently unavailable due to high demand. Please try again later.");
       }
       
-      return humanizedText;
-    } catch (error) {
-      console.error("Error humanizing text:", error);
-      throw new Error("Failed to humanize the text. Please try again with a different sample or check your API key.");
+      throw new Error("Failed to humanize the text. Please try again later or with different text.");
     }
   }
 }

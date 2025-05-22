@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ const PlagiarismChecker = () => {
   const [result, setResult] = useState<PlagiarismResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   // Load API key from localStorage on component mount
   useEffect(() => {
@@ -64,9 +65,21 @@ const PlagiarismChecker = () => {
     }
 
     setIsLoading(true);
+    setIsRateLimited(false);
+    
     try {
       console.log("Starting plagiarism check");
       const analysisResult = await geminiService.checkPlagiarism(inputText);
+      
+      // Check if this is mock data from rate limiting fallback
+      if (analysisResult.details.includes("fallback result due to API rate limits")) {
+        setIsRateLimited(true);
+        toast({
+          title: "API Rate Limit Reached",
+          description: "Using fallback mode with simulated results. Quality may be reduced.",
+          variant: "warning"
+        });
+      }
       
       // Convert the result to the expected format
       const plagiarismResult: PlagiarismResult = {
@@ -82,25 +95,38 @@ const PlagiarismChecker = () => {
       };
       
       setResult(plagiarismResult);
-      toast({
-        title: "Plagiarism Check Complete",
-        description: "Your content has been analyzed for plagiarism.",
-      });
+      
+      if (!isRateLimited) {
+        toast({
+          title: "Plagiarism Check Complete",
+          description: "Your content has been analyzed for plagiarism.",
+        });
+      }
     } catch (error: any) {
       console.error('Error checking plagiarism:', error);
       
       // Display a more specific error message based on the error
       const errorMessage = error.message || "Unknown error occurred";
       
-      toast({
-        title: "Analysis Failed",
-        description: errorMessage.includes("API key") 
-          ? "API key validation failed. Please check your API key in settings and try again."
-          : errorMessage.includes("quota") || errorMessage.includes("rate limit") || errorMessage.includes("429")
-          ? "API rate limit exceeded. Please try again later or use a different API key."
-          : "Failed to complete plagiarism analysis. Please check your API key and try again.",
-        variant: "destructive"
-      });
+      // Check if it's a rate limit error
+      if (errorMessage.includes("rate limit") || 
+          errorMessage.includes("quota") || 
+          errorMessage.includes("429")) {
+        setIsRateLimited(true);
+        toast({
+          title: "API Rate Limit Exceeded",
+          description: "The service is temporarily unavailable due to high demand. Please try again later.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Analysis Failed",
+          description: errorMessage.includes("API key") 
+            ? "API key validation failed. Please check your API key in settings and try again."
+            : "Failed to complete plagiarism analysis. Please try again later.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -139,6 +165,20 @@ const PlagiarismChecker = () => {
 
       {/* Content */}
       <div className="p-6 space-y-6">
+        {/* Rate Limit Warning */}
+        {isRateLimited && (
+          <div className="flex items-start space-x-3 text-sm bg-amber-50 p-4 rounded-lg border border-amber-200 mb-4">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-700">Limited Service Mode</p>
+              <p className="text-amber-600 mt-1">
+                API rate limits have been reached. You're seeing fallback results with reduced quality. 
+                For best results, try again later or upgrade to a paid API key.
+              </p>
+            </div>
+          </div>
+        )}
+      
         {/* Input Section */}
         <div>
           <label className="block text-sm font-medium mb-2">Text to Check</label>
