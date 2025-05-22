@@ -4,7 +4,7 @@
 const apiKeyManager = {
   // Constants for storage keys
   API_KEY_STORAGE_KEY: 'gemini_api_key',
-  DEFAULT_API_KEY: 'AIzaSyCnISefZYuKmf-5o7lcC64pRZhwebgSnj4', // TODO: Replace with your actual Google Gemini API key
+  DEFAULT_API_KEY: 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA', // Google Gemini API key
   
   // Retrieve the API key from localStorage or use the default
   getApiKey: (): string | null => {
