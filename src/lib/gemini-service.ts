@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import apiKeyManager from "@/lib/api-key-manager";
 
@@ -324,7 +323,7 @@ class GeminiService {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {
               ...this.generationConfig,
-              temperature: 0.3, // Lower temperature for more factual responses
+              temperature: 0.3, // Lower temperature for more factual outputs
             },
             safetySettings: this.safetySettings,
           })
@@ -661,6 +660,7 @@ class GeminiService {
           }
           
           // Add at least one vocabulary example
+          const words = text.split(/\s+/).filter(w => w.trim().length > 0); // Define words here
           const longWords = words.filter(w => w.length > 8);
           if (longWords.length > 0) {
             const surroundingText = text.substring(
@@ -880,4 +880,3 @@ class GeminiService {
 
 // Export service with the same interface name expected by Dashboard.tsx
 export const geminiService = new GeminiService();
-
