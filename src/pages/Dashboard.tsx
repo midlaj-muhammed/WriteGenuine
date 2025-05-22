@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ShieldCheck, Bot, RefreshCw, Loader2 } from 'lucide-react';
+import { ShieldCheck, Bot, RefreshCw, Loader2, BarChart } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { toast } from '@/components/ui/use-toast';
@@ -12,6 +11,7 @@ import ToolCard from '@/components/dashboard/ToolCard';
 import PlagiarismResults from '@/components/dashboard/PlagiarismResults';
 import DetectionResults from '@/components/dashboard/DetectionResults';
 import HumanizeResults from '@/components/dashboard/HumanizeResults';
+import ToolsComparison from '@/components/ToolsComparison';
 import apiKeyManager from '@/lib/api-key-manager';
 
 const Dashboard = () => {
@@ -112,10 +112,11 @@ const Dashboard = () => {
         </div>
         
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid grid-cols-3 w-full max-w-lg mb-6 sm:mb-8">
+          <TabsList className="grid grid-cols-4 w-full max-w-xl mb-6 sm:mb-8">
             <TabsTrigger value="plagiarism" className="text-sm sm:text-base">Plagiarism Check</TabsTrigger>
             <TabsTrigger value="detection" className="text-sm sm:text-base">AI Detection</TabsTrigger>
             <TabsTrigger value="humanize" className="text-sm sm:text-base">AI Humanizer</TabsTrigger>
+            <TabsTrigger value="comparison" className="text-sm sm:text-base">Compare Tools</TabsTrigger>
           </TabsList>
           
           <TabsContent value="plagiarism">
@@ -247,6 +248,16 @@ const Dashboard = () => {
                   <HumanizeResults results={results.humanize} />
                 )}
               </div>
+            </ToolCard>
+          </TabsContent>
+          
+          <TabsContent value="comparison">
+            <ToolCard
+              icon={<BarChart size={20} className="sm:size-6" />}
+              title="Tools Comparison"
+              description="Analyze and compare results from all three tools to gain comprehensive insights."
+            >
+              <ToolsComparison />
             </ToolCard>
           </TabsContent>
         </Tabs>
