@@ -7,6 +7,7 @@ import { Check, Copy, ArrowRight, CheckCircle, Bot, RefreshCw, Sparkles } from '
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { geminiService } from '@/lib/gemini-service';
 
 interface HumanizeResultsProps {
   results: {
@@ -18,9 +19,13 @@ interface HumanizeResultsProps {
 
 const HumanizeResults = ({ results }: HumanizeResultsProps) => {
   const [copied, setCopied] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [humanizedText, setHumanizedText] = useState(results.humanizedText);
+  const [editableText, setEditableText] = useState(results.humanizedText);
+  const [isEditing, setIsEditing] = useState(false);
   
   const handleCopy = () => {
-    navigator.clipboard.writeText(results.humanizedText);
+    navigator.clipboard.writeText(humanizedText);
     setCopied(true);
     toast({
       title: "Copied",
@@ -28,10 +33,79 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
     });
     setTimeout(() => setCopied(false), 2000);
   };
-  
-  // Make sure humanizedText is not empty
-  const humanizedText = results.humanizedText || 
-    "I've tried to humanize your text by adding conversational elements, varied sentence structures, and more natural phrasing. This helps the content sound like it was written by a real person rather than an AI system. The key points and meaning remain the same, but the style is more authentic and engaging.";
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      const newHumanizedText = await geminiService.humanizeAI(results.originalText);
+      setHumanizedText(newHumanizedText);
+      setEditableText(newHumanizedText);
+      toast({
+        title: "Text Regenerated",
+        description: "Your content has been re-humanized with new patterns",
+      });
+    } catch (error) {
+      toast({
+        title: "Regeneration Failed",
+        description: "Could not regenerate humanized text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleImprove = async () => {
+    setIsRegenerating(true);
+    try {
+      // Use a specialized prompt to further humanize the text
+      const customPrompt = `
+      TASK: Further humanize this already-transformed text to make it even more naturally human-like.
+      
+      TEXT TO IMPROVE: "${humanizedText}"
+      
+      INSTRUCTIONS:
+      1. Preserve the original meaning and key points completely
+      2. Add more conversational elements, personal touches, and human imperfections
+      3. Vary the formality level slightly throughout to create natural fluctuations
+      4. Add 1-2 short personal asides or relevant anecdotes that strengthen the text
+      5. Incorporate more authentic thinking patterns including occasional backtracking or clarifications
+      6. Enhance the natural flow while maintaining clarity and coherence
+      7. Make sure the text would pass advanced AI detection tools
+      8. Focus especially on sounding genuinely human rather than merely "humanized"
+      
+      IMPORTANT:
+      - Return ONLY the improved text without any explanations or comments
+      - Don't fundamentally change the meaning or key points of the original
+      - Don't make it excessively informal if the topic requires expertise
+      `;
+      
+      const improvedText = await geminiService.humanizeAI(humanizedText, customPrompt);
+      setHumanizedText(improvedText);
+      setEditableText(improvedText);
+      toast({
+        title: "Text Improved",
+        description: "Your content has been further humanized for maximum authenticity",
+      });
+    } catch (error) {
+      toast({
+        title: "Improvement Failed",
+        description: "Could not further improve the text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    setHumanizedText(editableText);
+    setIsEditing(false);
+    toast({
+      title: "Changes Saved",
+      description: "Your edits have been successfully applied",
+    });
+  };
   
   // Calculate the difference in character count
   const originalLength = results.originalText.length;
@@ -39,6 +113,7 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
   const lengthDifference = humanizedLength - originalLength;
   const percentChange = Math.round((lengthDifference / originalLength) * 100);
   
+  // Human-like pattern improvements
   const improvements = [
     "Added natural conversational elements",
     "Varied sentence structures and lengths",
@@ -71,21 +146,49 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
                 </Badge>
               </div>
               
-              <div className="border rounded-lg p-4 bg-muted/10 relative mb-4">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-8 gap-1"
-                  onClick={handleCopy}
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copied" : "Copy"}
-                </Button>
-                
-                <p className="text-base leading-relaxed whitespace-pre-wrap pr-20">
-                  {humanizedText}
-                </p>
-              </div>
+              {!isEditing ? (
+                <div className="border rounded-lg p-4 bg-muted/10 relative mb-4">
+                  <div className="flex gap-1 absolute top-2 right-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1"
+                      onClick={handleCopy}
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  
+                  <p className="text-base leading-relaxed whitespace-pre-wrap pr-20">
+                    {humanizedText}
+                  </p>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <Textarea 
+                    value={editableText}
+                    onChange={(e) => setEditableText(e.target.value)}
+                    className="min-h-[300px] font-normal text-base mb-2"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit}>
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              )}
               
               <div className="flex justify-between text-muted-foreground text-sm">
                 <span>{humanizedText.length} characters</span>
@@ -95,12 +198,29 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
               </div>
               
               <div className="mt-6 flex gap-2">
-                <Button variant="outline" className="gap-1">
-                  <RefreshCw className="h-4 w-4" />
+                <Button 
+                  variant="outline" 
+                  className="gap-1"
+                  onClick={handleRegenerate}
+                  disabled={isRegenerating}
+                >
+                  {isRegenerating ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
                   Regenerate
                 </Button>
-                <Button className="gap-1">
-                  <Sparkles className="h-4 w-4" />
+                <Button 
+                  className="gap-1"
+                  onClick={handleImprove}
+                  disabled={isRegenerating}
+                >
+                  {isRegenerating ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                   Improve Further
                 </Button>
               </div>
@@ -152,6 +272,10 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
                     <ArrowRight className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <span>Removed formulaic AI patterns and phrases</span>
                   </li>
+                  <li className="flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>Introduced subtle inconsistencies typical of human writing</span>
+                  </li>
                 </ul>
               </div>
             </CardContent>
@@ -172,12 +296,12 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
                     <div>
                       <p className="font-medium">{improvement}</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {index === 0 && "Added natural markers like 'I think', 'honestly', and reflective questions."}
-                        {index === 1 && "Mixed short and long sentences to create a more natural rhythm."}
-                        {index === 2 && "Replaced mechanical transitions with more organic connections."}
-                        {index === 3 && "Incorporated first-person perspective and subjective observations."}
-                        {index === 4 && "Added informal expressions that feel more conversational."}
-                        {index === 5 && "Eliminated repetitive structures common in AI writing."}
+                        {index === 0 && "Added natural markers like 'I think', 'honestly', and reflective questions to create a more conversational tone."}
+                        {index === 1 && "Mixed short, medium, and long sentences to create a more natural rhythm and pacing in the text."}
+                        {index === 2 && "Replaced mechanical transitions like 'furthermore' and 'moreover' with more organic connections between ideas."}
+                        {index === 3 && "Incorporated first-person perspective, subjective observations, and natural thought expressions."}
+                        {index === 4 && "Added occasional informal expressions, contractions, and practical examples that feel more conversational."}
+                        {index === 5 && "Eliminated repetitive structures and overly precise language that are common in AI-generated content."}
                       </p>
                     </div>
                   </div>

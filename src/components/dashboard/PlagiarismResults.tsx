@@ -9,12 +9,15 @@ import {
   Shield, 
   ExternalLink,
   Copy,
-  Check
+  Check,
+  Globe,
+  BookOpen
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlagiarismSource } from '@/lib/gemini-service';
+import { Badge } from '@/components/ui/badge';
 
 interface PlagiarismResultsProps {
   results: {
@@ -58,6 +61,16 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
     return 'Low Originality';
   };
 
+  // Format URL for display
+  const formatUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + (urlObj.pathname !== '/' ? urlObj.pathname : '');
+    } catch (e) {
+      return url;
+    }
+  };
+
   // Ensure sources are properly formatted
   const validSources = React.useMemo(() => {
     if (!results.sources || !Array.isArray(results.sources)) {
@@ -79,6 +92,16 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
         similarity: source.similarity || 0
       }));
   }, [results.sources]);
+
+  // Check if a URL is valid
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   return (
     <div className="mt-8 space-y-6 animate-fade-in">
@@ -146,25 +169,37 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
               <Card key={index} className="overflow-hidden">
                 <CardContent className="p-0">
                   <div className="p-4 border-b bg-muted/20">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium">{source.title}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        {source.url.includes('jstor') ? (
+                          <BookOpen size={16} className="text-blue-600" />
+                        ) : (
+                          <Globe size={16} className="text-blue-600" /> 
+                        )}
+                        <h3 className="font-medium">{source.title}</h3>
+                      </div>
+                      <Badge className={`px-2 py-1 text-xs font-medium ${
                         source.similarity > 75 ? 'bg-red-100 text-red-800' : 
                         source.similarity > 50 ? 'bg-yellow-100 text-yellow-800' : 
                         'bg-green-100 text-green-800'
                       }`}>
                         {source.similarity}% Match
-                      </span>
+                      </Badge>
                     </div>
-                    <a 
-                      href={source.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs text-muted-foreground hover:underline flex items-center mt-1"
-                    >
-                      {source.url}
-                      <ExternalLink size={12} className="ml-1" />
-                    </a>
+                    
+                    {isValidUrl(source.url) ? (
+                      <a 
+                        href={source.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground hover:underline flex items-center mt-1"
+                      >
+                        {formatUrl(source.url)}
+                        <ExternalLink size={12} className="ml-1" />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground mt-1">{source.url}</span>
+                    )}
                   </div>
                   
                   <div className="p-4 relative bg-muted/5 border-l-4 border-yellow-500">
