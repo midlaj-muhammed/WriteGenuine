@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
 // Define the same interfaces as in mock-service.ts for compatibility
@@ -49,16 +48,42 @@ export interface ContentAnalysisResult {
 
 class GeminiService {
   private getApiKey(): string {
-    // Get the API key from the window object (set by api-key-manager.ts)
-    if (typeof window !== 'undefined' && (window as any).geminiApiKey) {
-      return (window as any).geminiApiKey;
+    // Try to get the API key from localStorage first
+    try {
+      if (typeof window !== 'undefined') {
+        // If the key is already in window object, use it
+        if ((window as any).geminiApiKey) {
+          return (window as any).geminiApiKey;
+        }
+        
+        // Get from localStorage with fallback to the default API key
+        const key = localStorage.getItem('gemini_api_key') || 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA';
+        
+        // Always set it on window for consistency
+        if (key) {
+          (window as any).geminiApiKey = key;
+          console.log("API Key loaded", key.substring(0, 8) + "...");
+        }
+        
+        return key;
+      }
+    } catch (e) {
+      console.error("Error retrieving API key:", e);
     }
-    throw new Error("API key not found. Please set your Google Generative AI API key.");
+    
+    // Fallback to the default key if storage access fails
+    console.log("Using default API key");
+    return 'AIzaSyBxOT0xuBWr_nieyiOmWbAtvUvzeOD89mA';
   }
 
   private getModel() {
     try {
       const apiKey = this.getApiKey();
+      if (!apiKey || apiKey.trim() === '') {
+        throw new Error("Empty API key");
+      }
+      
+      console.log("Initializing Gemini model with API key", apiKey.substring(0, 8) + "...");
       const genAI = new GoogleGenerativeAI(apiKey);
       return genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
     } catch (error) {
@@ -126,6 +151,7 @@ class GeminiService {
 
   async checkPlagiarism(text: string): Promise<ContentAnalysisResult> {
     try {
+      console.log("Starting plagiarism check...");
       const model = this.getModel();
       const prompt = `
       TASK: Conduct a comprehensive plagiarism analysis on the provided text.
@@ -163,28 +189,34 @@ class GeminiService {
       - Maintain consistency between the score and the detailed analysis
       `;
 
+      console.log("Sending request to Gemini API...");
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: this.generationConfig,
         safetySettings: this.safetySettings,
       });
 
+      console.log("Received response from Gemini API");
       const response = result.response;
       const textResponse = response.text();
       
       // Extract JSON from the response
+      console.log("Processing response...");
       const parsedResponse = this.extractJsonFromResponse(textResponse) as ContentAnalysisResult;
       
       // Validate and normalize the response
       if (typeof parsedResponse.score !== 'number' || parsedResponse.score < 0 || parsedResponse.score > 100) {
+        console.log("Invalid score in response, using fallback");
         parsedResponse.score = 85; // Default fallback
       }
       
       if (!parsedResponse.details || parsedResponse.details.trim() === '') {
+        console.log("Missing details in response, using fallback");
         parsedResponse.details = "The text has been analyzed for potential plagiarism. Please review the results.";
       }
       
       if (!parsedResponse.suggestions || !Array.isArray(parsedResponse.suggestions) || parsedResponse.suggestions.length === 0) {
+        console.log("Missing suggestions in response, using fallback");
         parsedResponse.suggestions = [
           "Ensure all direct quotes are properly cited",
           "Paraphrase content in your own words",
@@ -194,12 +226,28 @@ class GeminiService {
       }
       
       if (!parsedResponse.sources) {
+        console.log("No sources in response, using empty array");
         parsedResponse.sources = [];
       }
       
+      console.log("Plagiarism check completed successfully");
       return parsedResponse;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error checking plagiarism:", error);
+      
+      // More detailed error based on the type
+      if (error.message && error.message.includes("API key")) {
+        throw new Error("API key validation failed. Please check your Google Gemini API key and try again.");
+      }
+      
+      if (error.status && error.status === 403) {
+        throw new Error("API access forbidden. Your API key might be invalid or has reached its quota limit.");
+      }
+      
+      if (error.status && error.status === 429) {
+        throw new Error("Too many requests. You've exceeded the rate limits for the Gemini API. Please try again later.");
+      }
+      
       throw new Error("Failed to analyze text for plagiarism. Please try again with a different text sample or check your API key.");
     }
   }

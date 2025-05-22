@@ -65,6 +65,7 @@ const PlagiarismChecker = () => {
 
     setIsLoading(true);
     try {
+      console.log("Starting plagiarism check");
       const analysisResult = await geminiService.checkPlagiarism(inputText);
       
       // Convert the result to the expected format
@@ -85,11 +86,19 @@ const PlagiarismChecker = () => {
         title: "Plagiarism Check Complete",
         description: "Your content has been analyzed for plagiarism.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking plagiarism:', error);
+      
+      // Display a more specific error message based on the error
+      const errorMessage = error.message || "Unknown error occurred";
+      
       toast({
-        title: "Failed to check plagiarism",
-        description: "Please check your API key and try again.",
+        title: "Analysis Failed",
+        description: errorMessage.includes("API key") 
+          ? "API key validation failed. Please check your API key in settings and try again."
+          : errorMessage.includes("quota") || errorMessage.includes("rate limit") || errorMessage.includes("429")
+          ? "API rate limit exceeded. Please try again later or use a different API key."
+          : "Failed to complete plagiarism analysis. Please check your API key and try again.",
         variant: "destructive"
       });
     } finally {
