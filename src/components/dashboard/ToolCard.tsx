@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
@@ -16,18 +15,18 @@ const ToolCard = ({
   children 
 }: ToolCardProps) => (
   <Card className="w-full shadow-sm">
-    <CardHeader>
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+    <CardHeader className="space-y-4 sm:space-y-6">
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
           {icon}
         </div>
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+        <div className="space-y-1">
+          <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
+          <CardDescription className="text-sm sm:text-base">{description}</CardDescription>
         </div>
       </div>
     </CardHeader>
-    <CardContent>
+    <CardContent className="pt-0">
       {children}
     </CardContent>
   </Card>

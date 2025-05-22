@@ -126,28 +126,28 @@ const Dashboard = () => {
     <div className="min-h-screen flex flex-col">
       <Navigation />
       
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-28">
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight mb-4">Dashboard</h1>
-          <p className="text-muted-foreground">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-24 sm:py-28">
+        <div className="mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 sm:mb-4">Dashboard</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Use our tools to check, detect, and humanize your content.
           </p>
         </div>
         
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid grid-cols-3 w-full max-w-lg mb-8">
-            <TabsTrigger value="plagiarism">Plagiarism Check</TabsTrigger>
-            <TabsTrigger value="detection">AI Detection</TabsTrigger>
-            <TabsTrigger value="humanize">AI Humanizer</TabsTrigger>
+          <TabsList className="grid grid-cols-3 w-full max-w-lg mb-6 sm:mb-8">
+            <TabsTrigger value="plagiarism" className="text-sm sm:text-base">Plagiarism Check</TabsTrigger>
+            <TabsTrigger value="detection" className="text-sm sm:text-base">AI Detection</TabsTrigger>
+            <TabsTrigger value="humanize" className="text-sm sm:text-base">AI Humanizer</TabsTrigger>
           </TabsList>
           
           <TabsContent value="plagiarism">
             <ToolCard
-              icon={<ShieldCheck size={24} />}
+              icon={<ShieldCheck size={20} className="sm:size-6" />}
               title="Plagiarism Checker"
               description="Check your content against billions of web pages, academic papers, and publications."
             >
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <div>
                   <label htmlFor="plagiarism-text" className="block text-sm font-medium mb-2">
                     Enter text to check for plagiarism
@@ -155,16 +155,18 @@ const Dashboard = () => {
                   <Textarea 
                     id="plagiarism-text"
                     placeholder="Paste or type your content here..."
-                    className="min-h-[200px]"
+                    className="min-h-[150px] sm:min-h-[200px]"
                     value={text.plagiarism}
                     onChange={(e) => handleTextChange('plagiarism', e.target.value)}
                   />
                 </div>
                 
-                <div className="text-right">
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('plagiarism')} 
                     disabled={isLoading.plagiarism || !text.plagiarism.trim() || !apiKey}
+                    className="w-full sm:w-auto"
                   >
                     {isLoading.plagiarism ? (
                       <>
@@ -186,11 +188,11 @@ const Dashboard = () => {
           
           <TabsContent value="detection">
             <ToolCard
-              icon={<Bot size={24} />}
+              icon={<Bot size={20} className="sm:size-6" />}
               title="AI Detection"
               description="Analyze text to determine whether it was written by a human or AI."
             >
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <div>
                   <label htmlFor="detection-text" className="block text-sm font-medium mb-2">
                     Enter text to check for AI generation
@@ -198,21 +200,23 @@ const Dashboard = () => {
                   <Textarea 
                     id="detection-text"
                     placeholder="Paste or type your content here..."
-                    className="min-h-[200px]"
+                    className="min-h-[150px] sm:min-h-[200px]"
                     value={text.detection}
                     onChange={(e) => handleTextChange('detection', e.target.value)}
                   />
                 </div>
                 
-                <div className="text-right">
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('detection')} 
                     disabled={isLoading.detection || !text.detection.trim() || !apiKey}
+                    className="w-full sm:w-auto"
                   >
                     {isLoading.detection ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Detecting...
+                        Analyzing...
                       </>
                     ) : (
                       'Detect AI'
@@ -229,28 +233,30 @@ const Dashboard = () => {
           
           <TabsContent value="humanize">
             <ToolCard
-              icon={<RefreshCw size={24} />}
+              icon={<RefreshCw size={20} className="sm:size-6" />}
               title="AI Humanizer"
-              description="Transform AI text into natural human writing that bypasses detection."
+              description="Transform AI-generated text to sound more natural and human-like."
             >
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <div>
                   <label htmlFor="humanize-text" className="block text-sm font-medium mb-2">
                     Enter AI-generated text to humanize
                   </label>
                   <Textarea 
                     id="humanize-text"
-                    placeholder="Paste or type your AI-generated content here..."
-                    className="min-h-[200px]"
+                    placeholder="Paste or type your content here..."
+                    className="min-h-[150px] sm:min-h-[200px]"
                     value={text.humanize}
                     onChange={(e) => handleTextChange('humanize', e.target.value)}
                   />
                 </div>
                 
-                <div className="text-right">
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                  <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
                   <Button 
                     onClick={() => handleSubmit('humanize')} 
                     disabled={isLoading.humanize || !text.humanize.trim() || !apiKey}
+                    className="w-full sm:w-auto"
                   >
                     {isLoading.humanize ? (
                       <>
