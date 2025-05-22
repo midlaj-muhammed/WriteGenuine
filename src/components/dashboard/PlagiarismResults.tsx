@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -61,17 +60,28 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
     return 'Low Originality';
   };
 
-  // Format URL for display
+  // Format URL for display - enhanced for better readability
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
-      return urlObj.hostname + (urlObj.pathname !== '/' ? urlObj.pathname : '');
+      let displayUrl = urlObj.hostname;
+      
+      // Add path if it's not just the root
+      if (urlObj.pathname !== '/' && urlObj.pathname !== '') {
+        // Trim the path if it's too long
+        const pathDisplay = urlObj.pathname.length > 30 
+          ? urlObj.pathname.substring(0, 30) + '...' 
+          : urlObj.pathname;
+        displayUrl += pathDisplay;
+      }
+      
+      return displayUrl;
     } catch (e) {
       return url;
     }
   };
 
-  // Ensure sources are properly formatted
+  // Ensure sources are properly formatted and validated
   const validSources = React.useMemo(() => {
     if (!results.sources || !Array.isArray(results.sources)) {
       return [];
@@ -83,11 +93,12 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
         typeof source === 'object' && 
         source.text && 
         source.url && 
-        typeof source.similarity === 'number'
+        typeof source.similarity === 'number' &&
+        isValidUrl(source.url) // Add URL validation
       )
       .map(source => ({
         ...source,
-        title: source.title || source.url.split('/').pop() || 'Unknown Source',
+        title: source.title || extractTitleFromUrl(source.url),
         text: source.text || 'No matching text available',
         similarity: source.similarity || 0
       }));
@@ -97,9 +108,57 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
   const isValidUrl = (url: string) => {
     try {
       new URL(url);
-      return true;
+      return !url.includes("example.com") && !url.includes("placeholder");
     } catch (e) {
       return false;
+    }
+  };
+
+  // Extract a reasonable title from URL if title is missing
+  const extractTitleFromUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      
+      // Use hostname as base
+      let title = urlObj.hostname.replace('www.', '');
+      
+      // Extract organization name from domain
+      const domainParts = title.split('.');
+      if (domainParts.length >= 2) {
+        title = domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+      }
+      
+      // Add path info if available
+      if (urlObj.pathname !== '/' && urlObj.pathname !== '') {
+        const pathParts = urlObj.pathname.split('/').filter(p => p);
+        if (pathParts.length > 0) {
+          const lastPath = pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\./g, ' ');
+          title += ': ' + lastPath.charAt(0).toUpperCase() + lastPath.slice(1);
+        }
+      }
+      
+      return title;
+    } catch (e) {
+      return url.split('/').pop() || 'Source';
+    }
+  };
+
+  // Determine source type icon based on URL
+  const getSourceIcon = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname.toLowerCase();
+      
+      if (domain.includes('jstor') || 
+          domain.includes('scholar') || 
+          domain.includes('academic') ||
+          domain.includes('research')) {
+        return <BookOpen size={16} className="text-blue-600" />;
+      }
+      
+      return <Globe size={16} className="text-blue-600" />;
+    } catch (e) {
+      return <Globe size={16} className="text-blue-600" />;
     }
   };
 
@@ -171,11 +230,7 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
                   <div className="p-4 border-b bg-muted/20">
                     <div className="flex justify-between items-center flex-wrap gap-2">
                       <div className="flex items-center gap-2">
-                        {source.url.includes('jstor') ? (
-                          <BookOpen size={16} className="text-blue-600" />
-                        ) : (
-                          <Globe size={16} className="text-blue-600" /> 
-                        )}
+                        {getSourceIcon(source.url)}
                         <h3 className="font-medium">{source.title}</h3>
                       </div>
                       <Badge className={`px-2 py-1 text-xs font-medium ${
@@ -187,19 +242,15 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
                       </Badge>
                     </div>
                     
-                    {isValidUrl(source.url) ? (
-                      <a 
-                        href={source.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground hover:underline flex items-center mt-1"
-                      >
-                        {formatUrl(source.url)}
-                        <ExternalLink size={12} className="ml-1" />
-                      </a>
-                    ) : (
-                      <span className="text-xs text-muted-foreground mt-1">{source.url}</span>
-                    )}
+                    <a 
+                      href={source.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-muted-foreground hover:underline flex items-center mt-1"
+                    >
+                      {formatUrl(source.url)}
+                      <ExternalLink size={12} className="ml-1" />
+                    </a>
                   </div>
                   
                   <div className="p-4 relative bg-muted/5 border-l-4 border-yellow-500">
