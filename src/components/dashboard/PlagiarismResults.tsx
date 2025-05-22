@@ -58,12 +58,34 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
     return 'Low Originality';
   };
 
+  // Ensure sources are properly formatted
+  const validSources = React.useMemo(() => {
+    if (!results.sources || !Array.isArray(results.sources)) {
+      return [];
+    }
+    
+    return results.sources
+      .filter(source => 
+        source && 
+        typeof source === 'object' && 
+        source.text && 
+        source.url && 
+        typeof source.similarity === 'number'
+      )
+      .map(source => ({
+        ...source,
+        title: source.title || source.url.split('/').pop() || 'Unknown Source',
+        text: source.text || 'No matching text available',
+        similarity: source.similarity || 0
+      }));
+  }, [results.sources]);
+
   return (
     <div className="mt-8 space-y-6 animate-fade-in">
       <Tabs defaultValue="overview">
         <TabsList className="mb-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sources">Sources ({results.sources?.length || 0})</TabsTrigger>
+          <TabsTrigger value="sources">Sources ({validSources.length})</TabsTrigger>
           <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
         </TabsList>
         
@@ -103,8 +125,8 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
             <div className="flex items-center space-x-2">
               <Shield className="text-primary h-5 w-5" />
               <span className="text-sm">
-                {results.sources && results.sources.length > 0 
-                  ? `${results.sources.length} potential sources identified` 
+                {validSources.length > 0 
+                  ? `${validSources.length} potential sources identified` 
                   : 'No matching sources found'}
               </span>
             </div>
@@ -119,13 +141,13 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
         </TabsContent>
         
         <TabsContent value="sources" className="space-y-4">
-          {results.sources && results.sources.length > 0 ? (
-            results.sources.map((source, index) => (
+          {validSources.length > 0 ? (
+            validSources.map((source, index) => (
               <Card key={index} className="overflow-hidden">
                 <CardContent className="p-0">
                   <div className="p-4 border-b bg-muted/20">
                     <div className="flex justify-between items-center">
-                      <h3 className="font-medium">{source.title || 'Untitled Source'}</h3>
+                      <h3 className="font-medium">{source.title}</h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         source.similarity > 75 ? 'bg-red-100 text-red-800' : 
                         source.similarity > 50 ? 'bg-yellow-100 text-yellow-800' : 
