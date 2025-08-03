@@ -66,8 +66,10 @@ const Index = () => {
                 Get Started <ArrowRight size={16} />
               </Link>
             </Button>
-            <Button variant="outline" size="lg">
-              Learn More
+            <Button variant="outline" size="lg" asChild>
+              <Link to="/plagiarism" className="gap-2">
+                Try Plagiarism Checker <ArrowRight size={16} />
+              </Link>
             </Button>
           </div>
         </div>

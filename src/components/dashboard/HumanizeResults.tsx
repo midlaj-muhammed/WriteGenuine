@@ -1,12 +1,16 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Copy, ArrowRight, CheckCircle, Bot, RefreshCw, Sparkles } from 'lucide-react';
+import { Check, Copy, ArrowRight, CheckCircle, Bot, RefreshCw, Sparkles, Settings, Sliders } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { geminiService } from '@/lib/gemini-service';
 
 interface HumanizeResultsProps {
@@ -23,6 +27,14 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
   const [humanizedText, setHumanizedText] = useState(results.humanizedText);
   const [editableText, setEditableText] = useState(results.humanizedText);
   const [isEditing, setIsEditing] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
+  // Advanced customization options
+  const [selectedStyle, setSelectedStyle] = useState<'casual' | 'professional' | 'academic' | 'conversational'>('professional');
+  const [selectedTone, setSelectedTone] = useState<'friendly' | 'authoritative' | 'empathetic' | 'neutral'>('neutral');
+  const [creativityLevel, setCreativityLevel] = useState([70]);
+  const [formalityLevel, setFormalityLevel] = useState([50]);
+  const [lengthPreference, setLengthPreference] = useState<'expand' | 'condense' | 'maintain'>('maintain');
   
   const handleCopy = () => {
     navigator.clipboard.writeText(humanizedText);
@@ -58,44 +70,105 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
   const handleImprove = async () => {
     setIsRegenerating(true);
     try {
-      // Use a specialized prompt to further humanize the text
-      const customPrompt = `
-      TASK: Further humanize this already-transformed text to make it even more naturally human-like.
-      
-      TEXT TO IMPROVE: "${humanizedText}"
-      
-      INSTRUCTIONS:
-      1. Preserve the original meaning and key points completely
-      2. Add more conversational elements, personal touches, and human imperfections
-      3. Vary the formality level slightly throughout to create natural fluctuations
-      4. Add 1-2 short personal asides or relevant anecdotes that strengthen the text
-      5. Incorporate more authentic thinking patterns including occasional backtracking or clarifications
-      6. Enhance the natural flow while maintaining clarity and coherence
-      7. Make sure the text would pass advanced AI detection tools
-      8. Focus especially on sounding genuinely human rather than merely "humanized"
-      
-      IMPORTANT:
-      - Return ONLY the improved text without any explanations or comments
-      - Don't fundamentally change the meaning or key points of the original
-      - Don't make it excessively informal if the topic requires expertise
-      `;
-      
-      const improvedText = await geminiService.humanizeAI(humanizedText, customPrompt);
+      // Generate advanced custom prompt based on user preferences
+      const customPrompt = generateAdvancedHumanizationPrompt(
+        humanizedText,
+        selectedStyle,
+        selectedTone,
+        creativityLevel[0],
+        formalityLevel[0],
+        lengthPreference
+      );
+
+      const improvedText = await geminiService.humanizeAI(humanizedText, customPrompt, selectedStyle);
       setHumanizedText(improvedText);
       setEditableText(improvedText);
       toast({
-        title: "Text Improved",
-        description: "Your content has been further humanized for maximum authenticity",
+        title: "Text Enhanced",
+        description: `Content improved with ${selectedStyle} style and ${selectedTone} tone`,
       });
     } catch (error) {
       toast({
-        title: "Improvement Failed",
-        description: "Could not further improve the text. Please try again.",
+        title: "Enhancement Failed",
+        description: "Could not enhance the text. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsRegenerating(false);
     }
+  };
+
+  // Generate advanced humanization prompt based on user preferences
+  const generateAdvancedHumanizationPrompt = (
+    text: string,
+    style: string,
+    tone: string,
+    creativity: number,
+    formality: number,
+    length: string
+  ) => {
+    const creativityInstructions = creativity > 70
+      ? "Be highly creative with language choices, add unique expressions and creative analogies"
+      : creativity > 40
+      ? "Use moderate creativity with some unique expressions and varied language"
+      : "Keep language straightforward with minimal creative flourishes";
+
+    const formalityInstructions = formality > 70
+      ? "Maintain high formality with professional language and structured presentation"
+      : formality > 40
+      ? "Balance formal and informal elements for natural professional communication"
+      : "Use casual, relaxed language with informal expressions and contractions";
+
+    const lengthInstructions = {
+      expand: "Expand the content by 20-30% with additional details, examples, and elaboration",
+      condense: "Condense the content by 15-25% while preserving all key information",
+      maintain: "Keep approximately the same length while improving naturalness"
+    };
+
+    const toneInstructions = {
+      friendly: "Use warm, approachable language with positive expressions and inclusive tone",
+      authoritative: "Convey expertise and confidence with decisive language and clear assertions",
+      empathetic: "Show understanding and consideration with compassionate language choices",
+      neutral: "Maintain balanced, objective tone without strong emotional coloring"
+    };
+
+    return `
+    TASK: Advanced humanization enhancement with specific customization preferences.
+
+    TEXT TO ENHANCE: "${text}"
+
+    STYLE: ${style.toUpperCase()}
+    TONE: ${tone.toUpperCase()}
+    CREATIVITY LEVEL: ${creativity}/100
+    FORMALITY LEVEL: ${formality}/100
+    LENGTH PREFERENCE: ${length.toUpperCase()}
+
+    SPECIFIC INSTRUCTIONS:
+
+    CREATIVITY: ${creativityInstructions}
+
+    FORMALITY: ${formalityInstructions}
+
+    LENGTH: ${lengthInstructions[length]}
+
+    TONE: ${toneInstructions[tone]}
+
+    ADVANCED HUMANIZATION TECHNIQUES:
+    1. Add subtle personal perspectives and authentic voice elements
+    2. Incorporate natural speech patterns and thinking processes
+    3. Use varied sentence structures that feel genuinely human
+    4. Add appropriate hesitations, qualifiers, or confident assertions based on tone
+    5. Include relevant examples or analogies that enhance understanding
+    6. Ensure the text would pass the most advanced AI detection systems
+    7. Make every sentence feel like it came from a real person's mind
+
+    CRITICAL REQUIREMENTS:
+    - Preserve all original meaning and key information
+    - Apply the specified style, tone, creativity, and formality levels precisely
+    - Adjust length according to preference while maintaining quality
+    - Return ONLY the enhanced text without explanations or comments
+    - Make it sound authentically human, not artificially "humanized"
+    `;
   };
 
   const handleSaveEdit = () => {
@@ -197,32 +270,139 @@ const HumanizeResults = ({ results }: HumanizeResultsProps) => {
                 </span>
               </div>
               
-              <div className="mt-6 flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="gap-1"
-                  onClick={handleRegenerate}
-                  disabled={isRegenerating}
-                >
-                  {isRegenerating ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Regenerate
-                </Button>
-                <Button 
-                  className="gap-1"
-                  onClick={handleImprove}
-                  disabled={isRegenerating}
-                >
-                  {isRegenerating ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  Improve Further
-                </Button>
+              <div className="mt-6 space-y-4">
+                {/* Advanced Options Panel */}
+                <Collapsible open={showAdvancedOptions} onOpenChange={setShowAdvancedOptions}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full gap-2">
+                      <Settings className="h-4 w-4" />
+                      Advanced Enhancement Options
+                      <Sliders className="h-4 w-4 ml-auto" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 mt-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm">Customization Settings</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Style Selection */}
+                          <div className="space-y-2">
+                            <Label htmlFor="style-select">Writing Style</Label>
+                            <Select value={selectedStyle} onValueChange={(value: any) => setSelectedStyle(value)}>
+                              <SelectTrigger id="style-select">
+                                <SelectValue placeholder="Select style" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="casual">Casual & Friendly</SelectItem>
+                                <SelectItem value="professional">Professional</SelectItem>
+                                <SelectItem value="academic">Academic & Scholarly</SelectItem>
+                                <SelectItem value="conversational">Conversational</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Tone Selection */}
+                          <div className="space-y-2">
+                            <Label htmlFor="tone-select">Tone</Label>
+                            <Select value={selectedTone} onValueChange={(value: any) => setSelectedTone(value)}>
+                              <SelectTrigger id="tone-select">
+                                <SelectValue placeholder="Select tone" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="friendly">Friendly & Warm</SelectItem>
+                                <SelectItem value="authoritative">Authoritative</SelectItem>
+                                <SelectItem value="empathetic">Empathetic</SelectItem>
+                                <SelectItem value="neutral">Neutral</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Creativity Level */}
+                          <div className="space-y-2">
+                            <Label>Creativity Level: {creativityLevel[0]}%</Label>
+                            <Slider
+                              value={creativityLevel}
+                              onValueChange={setCreativityLevel}
+                              max={100}
+                              min={0}
+                              step={10}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Conservative</span>
+                              <span>Creative</span>
+                            </div>
+                          </div>
+
+                          {/* Formality Level */}
+                          <div className="space-y-2">
+                            <Label>Formality Level: {formalityLevel[0]}%</Label>
+                            <Slider
+                              value={formalityLevel}
+                              onValueChange={setFormalityLevel}
+                              max={100}
+                              min={0}
+                              step={10}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Casual</span>
+                              <span>Formal</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Length Preference */}
+                        <div className="space-y-2">
+                          <Label htmlFor="length-select">Length Preference</Label>
+                          <Select value={lengthPreference} onValueChange={(value: any) => setLengthPreference(value)}>
+                            <SelectTrigger id="length-select">
+                              <SelectValue placeholder="Select length preference" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="expand">Expand (+20-30%)</SelectItem>
+                              <SelectItem value="maintain">Maintain Current Length</SelectItem>
+                              <SelectItem value="condense">Condense (-15-25%)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-1"
+                    onClick={handleRegenerate}
+                    disabled={isRegenerating}
+                  >
+                    {isRegenerating ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Regenerate
+                  </Button>
+                  <Button
+                    className="gap-1"
+                    onClick={handleImprove}
+                    disabled={isRegenerating}
+                  >
+                    {isRegenerating ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Enhance with Options
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

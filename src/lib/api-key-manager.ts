@@ -5,16 +5,22 @@
 const apiKeyManager = {
   // Constants for storage keys
   API_KEY_STORAGE_KEY: 'gemini_api_key',
-  DEFAULT_API_KEY: 'AIzaSyCfybgjLfBM543cFSc-kbAoqcRSlLD8yxo', // Updated Gemini API key
+  DEFAULT_API_KEY: 'AIzaSyDxqkXnA-zYvrE4ZSKL_BF4h1gdEBLVwQQ',
   
   // Retrieve the API key from localStorage or use the default
   getApiKey: (): string | null => {
     if (typeof window !== 'undefined') {
-      const key = localStorage.getItem(apiKeyManager.API_KEY_STORAGE_KEY) || apiKeyManager.DEFAULT_API_KEY;
+      const storedKey = localStorage.getItem(apiKeyManager.API_KEY_STORAGE_KEY);
+      const key = storedKey || apiKeyManager.DEFAULT_API_KEY;
       
       // Also set it on the window object for easy access by services
       if (key) {
-        (window as any).geminiApiKey = key;
+        (window as Window).geminiApiKey = key;
+      }
+      
+      // Log for debugging (only first few characters)
+      if (key) {
+        console.log("API Key retrieved:", key.substring(0, 8) + "...");
       }
       
       return key;
@@ -32,7 +38,7 @@ const apiKeyManager = {
     if (typeof window !== 'undefined') {
       localStorage.setItem(apiKeyManager.API_KEY_STORAGE_KEY, key);
       // Set a global variable that can be accessed by the service
-      (window as any).geminiApiKey = key;
+      (window as Window).geminiApiKey = key;
       
       // Dispatch an event to notify other components about the API key change
       const event = new CustomEvent('apikey-changed', { detail: key });
@@ -51,7 +57,7 @@ const apiKeyManager = {
   clearApiKey: (): void => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(apiKeyManager.API_KEY_STORAGE_KEY);
-      delete (window as any).geminiApiKey;
+      delete (window as Window).geminiApiKey;
       
       // Dispatch an event to notify other components about the API key change
       const event = new CustomEvent('apikey-changed', { detail: null });

@@ -81,29 +81,6 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
     }
   };
 
-  // Ensure sources are properly formatted and validated
-  const validSources = React.useMemo(() => {
-    if (!results.sources || !Array.isArray(results.sources)) {
-      return [];
-    }
-    
-    return results.sources
-      .filter(source => 
-        source && 
-        typeof source === 'object' && 
-        source.text && 
-        source.url && 
-        typeof source.similarity === 'number' &&
-        isValidUrl(source.url) // Add URL validation
-      )
-      .map(source => ({
-        ...source,
-        title: source.title || extractTitleFromUrl(source.url),
-        text: source.text || 'No matching text available',
-        similarity: source.similarity || 0
-      }));
-  }, [results.sources]);
-
   // Check if a URL is valid
   const isValidUrl = (url: string) => {
     try {
@@ -142,6 +119,29 @@ const PlagiarismResults = ({ results }: PlagiarismResultsProps) => {
       return url.split('/').pop() || 'Source';
     }
   };
+
+  // Ensure sources are properly formatted and validated
+  const validSources = React.useMemo(() => {
+    if (!results.sources || !Array.isArray(results.sources)) {
+      return [];
+    }
+    
+    return results.sources
+      .filter(source => 
+        source && 
+        typeof source === 'object' && 
+        source.text && 
+        source.url && 
+        typeof source.similarity === 'number' &&
+        isValidUrl(source.url) // Add URL validation
+      )
+      .map(source => ({
+        ...source,
+        title: source.title || extractTitleFromUrl(source.url),
+        text: source.text || 'No matching text available',
+        similarity: source.similarity || 0
+      }));
+  }, [results.sources]);
 
   // Determine source type icon based on URL
   const getSourceIcon = (url: string) => {

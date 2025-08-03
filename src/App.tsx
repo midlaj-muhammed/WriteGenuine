@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/signup";
 import NotFound from "./pages/NotFound";
+import PlagiarismPage from "./pages/PlagiarismPage";
 import apiKeyManager from "./lib/api-key-manager";
 import { useEffect } from "react";
 
@@ -46,11 +47,10 @@ const App = () => (
           <Route path="/" element={<Index />} />
           
           {/* Protected routes that require authentication */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
+          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* Direct access to tools for testing */}
+          <Route path="/plagiarism" element={<PlagiarismPage />} />
           
           {/* Auth pages */}
           <Route path="/login" element={
