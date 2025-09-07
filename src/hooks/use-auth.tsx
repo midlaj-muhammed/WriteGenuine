@@ -4,20 +4,18 @@ import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { api } from "../convex/_generated/api";
 import { useEffect, useState } from "react";
 
-// Define the correct type for Convex function references
-// This is a workaround for development mode with auto-generated types
-type ConvexFunction = any; // This allows us to bypass TypeScript checking during development
-
 export function useAuth() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { user } = useUser();
   
-  // Cast the string to any to bypass TypeScript checking during development
-  const createUser = useMutation(api.users.createUser as ConvexFunction);
+  // TODO: Fix Convex API types when generated types are properly configured
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const createUser = useMutation(api.users.createUser as any);
   const [isInitialized, setIsInitialized] = useState(false);
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userData = useQuery(
-    api.users.getUserByClerkId as ConvexFunction,
+    api.users.getUserByClerkId as any,
     user?.id ? { clerkId: user.id } : "skip"
   );
 
@@ -26,20 +24,33 @@ export function useAuth() {
     const syncUser = async () => {
       if (isAuthenticated && user && !isInitialized) {
         try {
-          await createUser({
+          // Use Promise.race to timeout user creation if it takes too long
+          const userCreationPromise = createUser({
             clerkId: user.id,
             email: user.primaryEmailAddress?.emailAddress || "",
             firstName: user.firstName || "",
             lastName: user.lastName || "",
           });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('User creation timeout')), 5000)
+          );
+
+          await Promise.race([userCreationPromise, timeoutPromise]);
           setIsInitialized(true);
         } catch (error) {
           console.error("Failed to sync user with Convex:", error);
+          // Mark as initialized even if creation fails to prevent infinite retries
+          // The createUser mutation handles duplicate users gracefully
+          setIsInitialized(true);
         }
       }
     };
 
-    syncUser();
+    // Immediate execution for faster response
+    if (isAuthenticated && user && !isInitialized) {
+      syncUser();
+    }
   }, [isAuthenticated, user, createUser, isInitialized]);
 
   return {

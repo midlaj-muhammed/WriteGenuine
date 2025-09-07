@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { geminiService } from '@/lib/gemini-service';
+import geminiService from '@/lib/gemini-service';
 
 interface HumanizeResultsProps {
   results: {

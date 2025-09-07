@@ -8,7 +8,7 @@ import { Loader2, Share2, Download, ArrowDownToLine, RefreshCw } from 'lucide-re
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { geminiService } from '@/lib/gemini-service';
+import geminiService from '@/lib/gemini-service';
 
 // Define the types for our analysis results
 type AnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -31,10 +31,8 @@ interface ComparisonResult {
   };
 }
 
-const DEFAULT_TEXT = `Artificial intelligence (AI) is revolutionizing how we interact with technology. Machine learning algorithms, a subset of AI, enable computers to learn from data and improve over time without explicit programming. These systems can now recognize patterns, make decisions, and even generate creative content. The rapid advancement of AI has led to both excitement about its potential benefits and concerns about its societal impacts. As we continue to integrate AI into various aspects of our lives, it becomes increasingly important to establish ethical guidelines and regulatory frameworks to ensure responsible development and deployment of these technologies.`;
-
 const ToolsComparison = () => {
-  const [inputText, setInputText] = useState(DEFAULT_TEXT);
+  const [inputText, setInputText] = useState('');
   const [results, setResults] = useState<ComparisonResult>({
     plagiarism: { status: 'idle', data: null },
     detection: { status: 'idle', data: null },

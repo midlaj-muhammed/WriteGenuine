@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { geminiService } from '@/lib/gemini-service';
+import geminiService from '@/lib/gemini-service';
 import apiKeyManager from '@/lib/api-key-manager';
 
 const HumanizedTextPreview = () => {

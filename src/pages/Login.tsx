@@ -38,9 +38,9 @@ const Login = () => {
         console.error("Login failed", result);
         toast.error("Something went wrong. Please try again.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during login:", error);
-      toast.error(error.errors?.[0]?.message || "An error occurred during login");
+      toast.error((error as { errors?: Array<{ message: string }> })?.errors?.[0]?.message || "An error occurred during login");
     } finally {
       setIsLoading(false);
     }

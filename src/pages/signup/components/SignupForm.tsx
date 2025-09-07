@@ -29,7 +29,7 @@ const SignupForm = () => {
       setIsLoading(true);
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       toast.success("Verification code sent. Please check your email (including spam folder).");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error resending verification:", error);
       toast.error("Failed to send verification code. Please try again.");
     } finally {
@@ -62,9 +62,9 @@ const SignupForm = () => {
         toast.success("Account verified successfully!");
         navigate("/dashboard");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during verification:", error);
-      const errorMessage = error.errors?.[0]?.message || "Failed to verify email";
+      const errorMessage = (error as { errors?: Array<{ message: string }> })?.errors?.[0]?.message || "Failed to verify email";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -111,18 +111,24 @@ const SignupForm = () => {
         { duration: 15000 }
       );
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error during signup:", error);
       
-      if (error.errors && error.errors.length > 0) {
-        const errorMessage = error.errors[0].message;
+      const typedError = error as { errors?: Array<{ message: string }> };
+      if (typedError.errors && typedError.errors.length > 0) {
+        const errorMessage = typedError.errors[0].message;
         
         if (errorMessage.includes("email")) {
           toast.error("Please enter a valid email address");
         } else if (errorMessage.includes("password")) {
           toast.error("Password must be at least 8 characters long");
-        } else if (errorMessage.includes("already exists")) {
-          toast.error("An account with this email already exists");
+        } else if (errorMessage.includes("already exists") || errorMessage.includes("identifier_already_exists")) {
+          toast.error("Account already exists! Please use the login page instead.", {
+            action: {
+              label: "Go to Login",
+              onClick: () => window.location.href = "/login"
+            }
+          });
         } else {
           toast.error(errorMessage);
         }

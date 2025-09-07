@@ -1,6 +1,6 @@
 
 import { createRoot } from 'react-dom/client';
-import { ClerkProvider } from '@clerk/clerk-react';
+import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import App from './App.tsx';
@@ -55,14 +55,7 @@ createRoot(document.getElementById("root")!).render(
   >
     <ConvexProviderWithClerk 
       client={convex} 
-      useAuth={() => ({ 
-        isAuthenticated: false,
-        isLoaded: true,
-        isSignedIn: false,
-        getToken: async () => "",
-        orgId: "",
-        orgRole: ""
-      })}
+      useAuth={useAuth}
     >
       <App />
     </ConvexProviderWithClerk>

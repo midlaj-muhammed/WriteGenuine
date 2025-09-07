@@ -18,6 +18,14 @@ export const createUser = mutation({
       .first();
 
     if (existingUser) {
+      // Update existing user data if needed (for OAuth users who might have updated info)
+      if (existingUser.email !== args.email || 
+          existingUser.name !== `${args.firstName} ${args.lastName}`.trim()) {
+        await ctx.db.patch(existingUser._id, {
+          email: args.email,
+          name: `${args.firstName} ${args.lastName}`.trim(),
+        });
+      }
       return existingUser._id;
     }
 
@@ -29,14 +37,22 @@ export const createUser = mutation({
       createdAt: Date.now(),
     });
 
-    // Create default free subscription
-    await ctx.db.insert("subscriptions", {
-      userId: args.clerkId,
-      plan: "free",
-      startDate: Date.now(),
-      endDate: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
-      status: "active",
-    });
+    // Check if subscription already exists (edge case for OAuth flows)
+    const existingSubscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", args.clerkId))
+      .first();
+
+    if (!existingSubscription) {
+      // Create default free subscription
+      await ctx.db.insert("subscriptions", {
+        userId: args.clerkId,
+        plan: "free",
+        startDate: Date.now(),
+        endDate: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
+        status: "active",
+      });
+    }
 
     return userId;
   },

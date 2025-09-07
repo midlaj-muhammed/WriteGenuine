@@ -5,7 +5,7 @@ import { Loader2, Search, AlertCircle, ExternalLink, ShieldCheck, AlertTriangle 
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { geminiService } from '@/lib/gemini-service';
+import geminiService from '@/lib/gemini-service';
 import apiKeyManager from '@/lib/api-key-manager';
 
 interface Source {

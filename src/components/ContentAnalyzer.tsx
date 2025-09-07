@@ -7,8 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2, Check, Copy, Info } from 'lucide-react';
-import { geminiService, ContentAnalysisResult } from '@/lib/gemini-service';
-import { type AIDetectionResult } from '@/lib/gemini-service';
+import geminiService, { ContentAnalysisResult } from '@/lib/gemini-service';
 import { toast } from '@/components/ui/use-toast';
 import apiKeyManager from '@/lib/api-key-manager';
 

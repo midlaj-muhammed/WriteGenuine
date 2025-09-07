@@ -3,11 +3,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import geminiService, { ContentAnalysisResult, AIDetectionResult } from '@/lib/gemini-service';
 import { ShieldCheck, Bot, RefreshCw, Loader2, BarChart, Upload } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { toast } from '@/components/ui/use-toast';
-import { geminiService, ContentAnalysisResult, AIDetectionResult } from '@/lib/gemini-service';
 import ToolCard from '@/components/dashboard/ToolCard';
 import PlagiarismResults from '@/components/dashboard/PlagiarismResults';
 import DetectionResults from '@/components/dashboard/DetectionResults';
@@ -107,7 +107,7 @@ const Dashboard = () => {
     } catch (error: unknown) {
       console.error(`Error in ${tab}:`, error);
       
-      const errorMessage = error.message || "Unknown error occurred";
+      const errorMessage = (error as Error).message || "Unknown error occurred";
       
       // Provide more specific error messages based on the error type
       if (errorMessage.includes("API key")) {
